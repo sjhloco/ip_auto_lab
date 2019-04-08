@@ -1,0 +1,22 @@
+---
+# To create and delete a local directory on the ansible server
+- name: "Create file structure"
+  hosts: 127.0.0.1
+  connection: local
+  gather_facts: yes
+  tasks:
+  - name: "SYS >> Create the directory with a timestamp"
+    file:
+      path: "/tmp/config_backups_{{ansible_date_time.date}}"
+      state: directory
+
+# Delete the directory
+- name: "Cleanup"
+  hosts: 127.0.0.1
+  connection: local
+  gather_facts: yes
+  tasks:
+  - name: "SYS >> Delete the directory"
+    file:
+      path: "/tmp/config_backups_{{ansible_date_time.date}}"
+      state: absent

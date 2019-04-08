@@ -1,0 +1,18 @@
+  # Clone a remote repositary to save the config output in
+  - name: GIT >> Clone private repo into /tmp
+    git:
+      repo: git@github.com:sjhloco/test_git.git
+      version: master
+      dest: /tmp/test_git
+
+      
+
+# Commit and push changes to it and cleanup file directory
+- hosts: localhost
+  tasks:
+  - name: GIT >> Commit and push changes
+    shell: |
+      cd /tmp/test_git
+      git add .
+      git commit -m "Config backups by Ansible {{hostvars.localhost.DATE}}"
+      git push

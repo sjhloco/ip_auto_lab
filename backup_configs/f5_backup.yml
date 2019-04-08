@@ -1,0 +1,18 @@
+---
+
+- name: Save the running configuration of the BIG-IP
+  hosts: bigip
+  bigip_config:
+    save: yes
+    provider:
+      server: 10.10.10.21
+      user: root
+
+https://docs.ansible.com/ansible/latest/modules/bigip_config_module.html
+
+DOesnt work, sasy needs 
+ERROR! 'bigip_config' is not a valid attribute for a Play
+
+but have alread yinstalled module
+
+pip install f5-sdk

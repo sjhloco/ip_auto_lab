@@ -1,0 +1,67 @@
+---
+# This playbook backs up the device configuratiosn to a remote git repo
+- name: "Creating file structure"
+  hosts: localhost
+  tasks:
+  # Create a date fact (variable) to be used in the name stored config file
+  - name: SYS >> Get ansible date/time facts
+    setup:
+      filter: "ansible_date_time"
+  - name: SYS >> Store Date in a Fact
+    set_fact:
+      DATE: "{{ ansible_date_time.date }}"
+
+  # Clone a remote repositary to save the config output in
+  - name: GIT >> Clone private repo into /tmp
+    git:
+      repo: git@github.com:sjhloco/ip_auto_lab.git
+      version: master
+      dest: /tmp/ip_auto_lab
+
+# Create copy of Cisco running config and save to file in /tmp
+- name: "Backing up Devices"
+  hosts: cisco
+#  hosts: cisco1       # For testing locally  
+  tasks:
+  - name: "NET >> Backup Cisco running configs"
+    ios_command:
+      commands: "{{ commands }}"      
+    register: CLI_OUTPUT              
+
+  - name: SYS >> Save output to backup dir
+    copy: 
+      content: "{{ CLI_OUTPUT.stdout[0] }}"
+      dest: "/tmp/ip_auto_lab/configurations/{{ inventory_hostname }}_{{hostvars.localhost.DATE}}"
+
+# Create copy of ASA running config and save to file in /tmp
+- name: "Backing up Devices"
+  hosts: firewall
+  tasks:
+  - name: "NET >> Backup ASA running configs"
+    asa_command:
+      commands: "{{ commands }}"     
+    register: CLI_OUTPUT            
+
+  - name: SYS >> Save output to backup dir
+    copy: 
+      content: "{{ CLI_OUTPUT.stdout[0] }}"
+      dest: "/tmp/ip_auto_lab/configurations/{{ inventory_hostname }}_{{hostvars.localhost.DATE}}"
+
+# Create copy of F5 config, download and save to file in /tmp
+# Still to do, cant get bigip_config to work
+
+# Commit and push changes to it and cleanup file directory
+- name: "Cleaning up directory"
+  hosts: localhost
+  tasks:
+  - name: GIT >> Commit and push changes
+    shell: |
+      cd /tmp/ip_auto_lab
+      git add .
+      git commit -m "Config backups by Ansible {{hostvars.localhost.DATE}}"
+      git push
+
+  - name: "SYS >> Delete the directory"
+    file:
+      path: "/tmp/ip_auto_lab"
+      state: absent

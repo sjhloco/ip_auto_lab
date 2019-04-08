@@ -1,0 +1,6 @@
+---
+ansible_network_os: "ios"
+
+commands:
+  - show running-config
+...
