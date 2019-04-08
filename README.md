@@ -18,4 +18,4 @@ Although the current network was built in the traditional hands on method, any e
 
 # Configuration backups
 
-The backup_configs Anisble playbook when run will backup all device configs except for the F5 and upload them to this repo. Need to revisit the F5 backup at a later date.  
+The backup_configs Ansible playbook when run will backup all device configs except for the F5 and upload them to this repo. Need to revisit the F5 backup at a later date.  
