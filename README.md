@@ -15,3 +15,7 @@ The main goal of the companies IT department is to grasp orchestration/automatio
 They are currently in the process of incorporating orchestration/automation workflows into their current day to day operations with the vision in the future that 99% of BAU or maintenance work will be done in this manner.
 
 Although the current network was built in the traditional hands on method, any expansion MUST be done via orchestration/automation tools.
+
+# Configuration backups
+
+The backup_configs Anisble playbook when run will backup all device configs except for the F5 and upload them to this repo. Need to revisit the F5 backup at a later date.  
