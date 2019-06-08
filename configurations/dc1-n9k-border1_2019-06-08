@@ -1,7 +1,7 @@
 
 !Command: show running-config
 !Running configuration last done at: Fri Jun  7 07:47:29 2019
-!Time: Sat Jun  8 13:17:00 2019
+!Time: Sat Jun  8 13:31:17 2019
 
 version 7.0(3)I7(6) Bios:version  
 hostname DC1-N9K-BORDER1
