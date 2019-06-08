@@ -1,0 +1,80 @@
+---
+# This playbook backs up the device configurations to a remote git repo
+
+- name: "Creating file structure"
+  hosts: localhost
+  tasks:
+  # Create the enviroment to save files including the git repo    
+  - name: SYS >> Cleanup old files  
+    file: path="{{ repo_path }}" state=absent
+  - name: GIT >> Clone private repo into /tmp    
+    git:
+      repo: "{{ git_repo }}"
+      version: master
+      dest: "{{ repo_path }}"   
+    changed_when: False     
+  - name: GIT >> Check git status       
+    shell: git status
+    args:
+      chdir: "{{ repo_path }}"         # changes to this dir before running the cmd
+    register: git_status
+    changed_when: False
+
+# Create copy of Cisco running configs
+- name: "Backing up Devices with NAPALM"
+  hosts: router:switch:firewall
+  connection: local
+  tasks:
+  - name: "NET >> Backup Cisco running configs"
+    napalm_get_facts:
+      provider: "{{ creds_all }}"    
+      dev_os: "{{ os }}"
+      filter:
+        - "config"
+    tags: [print_action]    
+  # Save the configs to file in /tmp
+  - name: SYS >> Save output to backup dir
+    copy: 
+      content: "{{ napalm_config.running }}"    # nested ansible fact
+      dest: "{{ repo_path }}/configurations/{{ inventory_hostname }}"
+    changed_when: False    
+
+# Create a F5 UCS backup
+- name: Backup BIGIP Devices with BIGIP module
+  hosts: bigip
+  tasks:
+  - name: Create and download a UCS
+    bigip_ucs_fetch:
+      src: "{{ inventory_hostname }}.ucs"
+      dest: "{{ repo_path }}/configurations/{{ inventory_hostname }}.ucs"
+      provider: "{{ creds_big_ip }}" 
+      backup: yes                 # Will backup if doesnt already exist
+    delegate_to: localhost
+    tags: [print_action]
+
+# Commit and push changes to it and cleanup file directory
+- name: "Push configs to GIT and cleanup up"
+  hosts: localhost
+  tasks:
+  # Create a date fact (variable) to be used in the name of the config file
+  - name: SYS >> Get ansible date/time facts
+    setup:
+      filter: "ansible_date_time"
+  - name: SYS >> Store ansible date/time facts      
+    set_fact:
+      DATE: "{{ ansible_date_time.date }}"
+  # Commit and push changes to remote git repo  
+  - name: GIT >> Commit and push changes
+    shell: |
+      git add .
+      git commit -m "Config backups by Ansible {{hostvars.localhost.DATE}}"
+      git push
+    args:
+      chdir: "{{ repo_path }}" 
+    when: not("working directory clean" in git_status.stdout)   
+    changed_when: False  
+  - name: "SYS >> Delete the directory"
+    file:
+      path: "{{ repo_path }}"
+      state: absent
+    changed_when: False      

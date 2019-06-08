@@ -1,5 +1,2 @@
 ---
-ansible_network_os: "asa"
-
-commands:
-  - show running-config
+os: asa

@@ -1,1 +1,6 @@
 ---
+creds_big_ip:
+  server: "{{ ansible_host|default(inventory_hostname) }}"
+  user: admin
+  password: ansible
+  validate_certs: no
