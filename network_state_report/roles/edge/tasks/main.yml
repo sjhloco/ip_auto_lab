@@ -1,0 +1,31 @@
+---
+- block:
+  - name: "NET >> Gathering all outputs"
+    napalm_cli:
+      provider: "{{ creds_all }}"
+      dev_os: "{{ os }}"
+      args:
+        commands: "{{ edge_cmds }}"       # Loops cmds from host_var
+    register: edge_output
+
+
+  - name: "SYS >> Passing through Python Filter"
+    set_fact:
+      edge_table: "{{ edge_output.cli_results | edge_filter(inventory_hostname, os, vpn_peer) }}"
+    changed_when: false
+  tags: [edge]
+
+- name: "SYS >> Creating nested list of all outputs"
+  set_fact:     # Need if statement to stop errors wehn only one device as cant create list
+    list_edge_table: |
+                    {% if edge_table | length >= 2 %}
+                    {% set x = [] %}
+                    {% for host in ansible_play_hosts %}
+                    {% do x.append(hostvars[host].edge_table) %}
+                    {% endfor %}
+                    {{ x|join(',') }}
+                    {% endif %}
+  run_once: once
+  delegate_to: localhost
+  delegate_facts: True       # What makes it a localhost_fact
+  tags: [edge]

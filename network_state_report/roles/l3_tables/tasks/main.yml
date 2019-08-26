@@ -1,0 +1,30 @@
+---
+# Had to use Ansible command module as couldnt use | include with NAPALM API based connections
+- block:
+  - name: "NET >> Gathering all outputs"
+    cli_command:
+      command: "{{ item }}"       # Loops cmds from host_var
+    register: l3_table_output
+    loop: "{{ l3_cmds }}"
+
+  - name: "SYS >> Passing through Python Filter"
+    set_fact:     # Passes output through filter
+      l3_table: "{{ l3_table_output['results'] | l3_filter(inventory_hostname) }}"
+    changed_when: False
+  tags: [l3]
+
+# Creates localhost_fact that is a list of all other host_facts (lists)
+- name: "SYS >> Creating nested list of all outputs"
+  set_fact:     # Need if statement to stop errors wehn only one device as cant create list
+    list_l3_table: |
+                    {% if l3_table | length >= 2 %}
+                    {% set x = [] %}
+                    {% for host in ansible_play_hosts %}
+                    {% do x.append(hostvars[host].l3_table) %}
+                    {% endfor %}
+                    {{ x|join(',') }}
+                    {% endif %}
+  run_once: once
+  delegate_to: localhost
+  delegate_facts: True       # What makes it a localhost_fact
+  tags: [l3]

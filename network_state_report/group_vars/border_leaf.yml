@@ -1,0 +1,4 @@
+---
+# Network Topology Information
+bgp_neigh: 4
+ospf_neigh: 3

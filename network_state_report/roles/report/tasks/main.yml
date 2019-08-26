@@ -1,0 +1,42 @@
+---
+- name: "SYS >> Creating BGP Table"
+  copy:
+    dest: "{{ tmp_path }}/bgp_table.txt"
+    content: "{{ list_bgp_table | bgp_table }}"
+  tags: [bgp]
+
+- name: "SYS >> Creating Edge Table"
+  copy:
+    dest: "{{ tmp_path }}/edge_table.txt"
+    content: "{{ list_edge_table | edge_table }}"
+  #tags: [edge]
+
+- name: "SYS >> Creating Interface Table"
+  copy:
+    dest: "{{ tmp_path }}/interface_table.txt"
+    content: "{{ list_interface_table | interface_table }}"
+  tags: [itf]
+
+- name: "SYS >> Creating L2 Table"
+  copy:
+    dest: "{{ tmp_path }}/l2_table.txt"
+    content: "{{ list_l2_table | l2_table }}"
+  tags: [l2]
+
+- name: "SYS >> Creating L3 Table"
+  copy:
+    dest: "{{ tmp_path }}/l3_table.txt"
+    content: "{{ list_l3_table | l3_table }}"
+  tags: [l3]
+
+- name: "SYS >> Creating OSPF Table"
+  copy:
+    dest: "{{ tmp_path }}/ospf_table.txt"
+    content: "{{ list_ospf_table | ospf_table }}"
+  tags: [ospf]
+
+- name: "SYS >> Creating VIP Table"
+  copy:
+    dest: "{{ tmp_path }}/vip_table.txt"
+    content: "{{ list_vip_table | vip_table }}"
+  tags: [vip]

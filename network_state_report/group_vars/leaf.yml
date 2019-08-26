@@ -1,0 +1,4 @@
+---
+# Network Topology Information
+bgp_neigh: 2
+ospf_neigh: 3       # border and leaf

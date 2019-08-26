@@ -1,0 +1,19 @@
+testbed:
+    name: bgp_testbed
+
+    tacacs:
+        username: admin
+    passwords:
+        tacacs: ansible    
+
+devices:
+    DC1-CSR-XNET1:
+        alias: csr1000v
+        os: iosxe
+        type: CSR1000v
+        connections:
+            defaults:
+                class: unicon.Unicon    
+            vty:
+                protocol: ssh
+                ip: 10.10.108.17

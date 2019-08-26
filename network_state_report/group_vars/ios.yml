@@ -1,0 +1,12 @@
+---
+# Connection Variables
+os: ios                         # Napalm
+ansible_network_os: ios         # Ansible
+
+# Commands used inthe various roles
+l2_cmds:                                   # Layer2 role
+  - show vlan
+  - show etherchannel summary
+  - show mac address-table
+  
+# Network Topology Information

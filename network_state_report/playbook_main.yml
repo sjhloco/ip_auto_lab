@@ -1,0 +1,73 @@
+---
+# This playbook creates tables of the state of different elements within the network
+
+- name: "Create file structure"
+  hosts: localhost
+  tasks:
+  # 1. Create the enviroment to save dynamically created files to
+  - block:
+    - name: SYS >> Deleting old temporary table directory
+      file: path="{{ tmp_path }}" state=absent
+      changed_when: False
+    - name: SYS >> Creating temporary table directory
+      file:
+        path: "{{ tmp_path }}"
+        state: directory
+      changed_when: False
+    check_mode: False
+    tags: report
+
+# 2. Run all the plays to gather output
+- name: "Gather BGP output"
+  hosts: nxos:router
+  connection: local
+  roles:
+    - bgp
+
+- name: "Gather Edge output"
+  hosts: router:firewall
+  connection: local
+  roles:
+    - edge
+
+- name: "Gather interface outputs"
+  hosts: switch:router:firewall
+  connection: local
+  roles:
+    - interfaces
+
+- name: "Gather L2 table outputs"
+  hosts: dmz:leaf
+  connection: local
+  roles:
+    - l2_tables
+
+- name: "Gather L3 tables and OSPF outputs"
+  hosts: router:firewall:nxos
+  connection: network_cli
+  roles:
+    - l3_tables
+    - ospf
+
+- name: "Gather VIP outputs"
+  hosts: ltm
+  connection: local
+  roles:
+    - vips
+
+# 3. Create tables from all the gathered outout
+- name: "Create Tables"
+  hosts: localhost
+  connection: local
+  roles:
+    - report
+
+# 4. Create a date fact (variable) and join tables in a time-stamped report
+  tasks:
+  - name: SYS >> Creating report from generated tables
+    assemble:
+      src: "{{ tmp_path }}"
+      dest: "{{ dir_path }}/network_state_{{ lookup('pipe','date +%Y-%m-%d_%H%M') }}.txt"
+    changed_when: False
+  check_mode: False
+  tags: report

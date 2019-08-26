@@ -1,0 +1,14 @@
+---
+# Connection Variables
+os: ios                         # Napalm
+ansible_network_os: ios         # Ansible
+
+# Connection Credentials
+creds_all:
+  hostname: "{{ ansible_host|default(inventory_hostname) }}"
+  username: ste
+  password: testing123
+
+# Commands used inthe various roles
+
+# Network Topology Information

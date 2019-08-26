@@ -1,0 +1,33 @@
+
+- block:
+  - name: "NET >> Gathering all outputs"
+    napalm_get_facts:
+      provider: "{{ creds_all }}"
+      dev_os: "{{ os }}"
+      filter: "{{ item }}"
+    register: itf_output
+    loop: "{{ itf_cmds }}"
+
+# Used a loop as asa as it cant take the lldp filter
+  - name: "SYS >> Passing through Python Filter"
+    set_fact:     # Passes output through filter
+      #interface_table: "{{ itf_output.results[0].ansible_facts | itf_filter(inventory_hostname) }}"
+      interface_table: "{{ itf_output.results | itf_filter(inventory_hostname) }}"
+    changed_when: False
+  tags: [itf]
+
+# Creates localhost_fact that is a list of all other host_facts (lists)
+- name: "SYS >> Creating nested list of all outputs"
+  set_fact:     # Need if statement to stop errors wehn only one device as cant create list
+    list_interface_table: |
+                          {% if interface_table | length >= 2 %}
+                          {% set x = [] %}
+                          {% for host in ansible_play_hosts %}
+                          {% do x.append(hostvars[host].interface_table) %}
+                          {% endfor %}
+                          {{ x|join(',') }}
+                          {% endif %}
+  run_once: once
+  delegate_to: localhost
+  delegate_facts: True       # What makes it a localhost_fac
+  tags: [itf]

@@ -1,0 +1,51 @@
+---
+# This role uses genie parsers to get the data structure
+- block:
+  - name: "NET >> Gathering all outputs"
+    napalm_cli:
+      provider: "{{ creds_all }}"
+      dev_os: "{{ os }}"
+      args:
+        commands: "{{ l2_cmds }}"       # Loops cmds from host_var
+    register: l2_output
+
+  - name: SYS >> Read in parse_genie role
+    include_role:
+      name: clay584.parse_genie
+
+# Uses Cisco Genie to parse the data into a proper data structure
+  - name: SYS >> Parse VLAN and MAC table
+    set_fact:
+      genie_vlan: "{{ l2_output.cli_results['show vlan'] | parse_genie(command='show vlan', os=os) }}"
+      genie_mac: "{{ l2_output.cli_results['show mac address-table'] | parse_genie(command='show mac address-table', os=os) }}"
+
+  - name: SYS >> Parse Port-Channel table (IOS)
+    set_fact:
+      genie_pc: "{{ l2_output.cli_results['show etherchannel summary'] | parse_genie(command='show etherchannel summary', os=os) }}"
+    when: os == 'ios'
+  - name: SYS >> Parse PC table (NXOS)
+    set_fact:
+      genie_pc: "{{ l2_output.cli_results['show port-channel summary'] | parse_genie(command='show port-channel summary', os=os) }}"
+    when: os == 'nxos'
+
+  - name: "SYS >> Passing through Python Filter"
+    set_fact:     # Passes output through filter with all the host_vars
+      l2_table: "{{ genie_vlan | l2_filter(inventory_hostname, genie_mac, genie_pc) }}"
+    changed_when: False
+  tags: [l2]
+
+# Creates localhost_fact that is a list of all other host_facts (lists)
+- name: "SYS >> Creating nested list of all outputs"
+  set_fact:     # Need if statement to stop errors wehn only one device as cant create list
+    list_l2_table: |
+                   {% if l2_table | length >= 2 %}
+                   {% set x = [] %}
+                   {% for host in ansible_play_hosts %}
+                   {% do x.append(hostvars[host].l2_table) %}
+                   {% endfor %}
+                   {{ x|join(',') }}
+                   {% endif %}
+  run_once: once
+  delegate_to: localhost
+  delegate_facts: True       # What makes it a localhost_fact
+  tags: [l2]

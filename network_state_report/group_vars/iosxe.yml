@@ -1,0 +1,20 @@
+---
+# Connection Variables
+os: ios                         # Napalm
+ansible_network_os: ios         # Ansible
+
+# Commands used inthe various roles
+edge_cmds:                                # edge role
+  - show ip nat translations total
+  - show crypto session
+l3_cmds:                                # Layer3 role
+  - show ip arp summary
+  - show ip route vrf * | in via|directly
+ospf_cmds:                                # OSPF role
+  - show ip ospf neighbor | include FULL
+  - show ip ospf database database-summary | in Total
+
+# Network Topology Information
+ospf_neigh: 1
+bgp_neigh: 4
+vpn_peer: 0

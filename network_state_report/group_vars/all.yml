@@ -1,0 +1,20 @@
+---
+ansible_python_interpreter: "/usr/bin/env python"          # Ubuntu
+
+# File structure variables
+tmp_path: ~/network_state/tmp_tables
+dir_path: ~/network_state
+
+# Connection Variables
+creds_all:                          # Napalm
+  hostname: "{{ ansible_host|default(inventory_hostname) }}"
+  username: admin
+  password: ansible
+
+ansible_user: admin                 # Ansible
+ansible_ssh_pass: ansible
+
+# Commands used inthe various roles
+itf_cmds:                                # Interfaces role
+  - interfaces
+  - lldp_neighbors
