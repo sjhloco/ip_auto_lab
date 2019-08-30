@@ -38,10 +38,10 @@ The following network specific variables are stored in *group_vars* and added to
 <br/>Builds the main directory, cleans the tmp directory and assembles all the tables into the one file
 
 ### Network Modules ###
-No one module could collect and parse all desired the output so the playbook uses a combination of Ansible *network_cli*, *command* (with native *Genie*), *napalm* and *parse_genie*.
+No one module could collect and parse all desired the output so the playbook uses a combination of Ansible *network_cli*, *napalm* and *parse_genie*.
 <br/>For commands that dont have parsers the playbook uses *| include*. Piping isnt supported by *napalm* APIs so for these commands *network_cli* is used.
-<br/>For parsers missing from *napalm* the playbook uses *parse_genie* as all the networking equipment used in this playbook is Cisco. *show bgp all summary* is broken in *parse_genie* so the Ansible *command* with native *Genie* is used instead for this one command.
-<br/><br/>username and passwords are stored in *group_vars* for *napalm* and *network_cli*. Until the parse-genie is fixed as the playbook has to use native *Genie* a *roles/bgp/bgp_testbed.yaml* file is required that also has the hostname, username and password for all CSRs.
+<br/>For parsers missing from *napalm* the playbook uses *parse_genie* as all the networking equipment used in this playbook is Cisco.
+<br/><br/>username and passwords are stored in *group_vars* for *napalm* and *network_cli*. 
 
 ### Tested on ###
 Has only been tested on the following versions of virtual equipment:
