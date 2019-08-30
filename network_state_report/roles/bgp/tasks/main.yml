@@ -17,15 +17,26 @@
 
 # NAPALM get_bgp_neighbors doesnt work with csr1000v so alternative method
 - block:
-  - name: NET >> Get IOSXE output
-    command: genie parse "show bgp all summary" --testbed-file roles/bgp/bgp_testbed.yaml --devices "DC1-CSR-XNET1"
+  - name: "NET >> Get IOSXE output"
+    napalm_cli:
+      provider: "{{ creds_all }}"
+      dev_os: "{{ os }}"
+      args:
+        commands: 
+        - show bgp all summary
     register: bgp_output
-    delegate_to: localhost
-    changed_when: False
+
+  - name: SYS >> Read in parse_genie role
+    include_role:
+      name: clay584.parse_genie
+
+  - name: SYS >> Parse BGP
+    set_fact:
+      genie_bgp: "{{ bgp_output.cli_results['show bgp all summary'] | parse_genie(command='show bgp all summary', os=os) }}"
 
   - name: "SYS >> Pass through Python Filter"
     set_fact: # Passes output through filter with bgp_neigh variable
-      bgp_table:  "{{ bgp_output['stdout'] | csr_bgp_filter(inventory_hostname, bgp_neigh) }}"
+      bgp_table:  "{{ genie_bgp | csr_bgp_filter(inventory_hostname, bgp_neigh) }}"
     changed_when: False
   tags: [bgp]
   when: os == 'ios'

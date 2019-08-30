@@ -1,4 +1,4 @@
-import json
+
 
 class FilterModule(object):
     def filters(self):
@@ -29,9 +29,8 @@ class FilterModule(object):
         enabled_bgp_neigh = 0
         up_bgp_neigh = 0
         bgp_pfxrcd = 0
-        z = []
-        bgp_output1 = json.loads(bgp_output)        # required to convert ansible input "<class 'dict'>"
-        for a in bgp_output1['vrf'].values():      # for each vrf
+
+        for a in bgp_output['vrf'].values():      # for each vrf
             for b in a['neighbor'].values():                # for each neighbor
                 enabled_bgp_neigh += 1                       # Adds up all up neighbors
                 for c in b['address_family'].values():      # for each address-family

@@ -9,7 +9,7 @@
   copy:
     dest: "{{ tmp_path }}/edge_table.txt"
     content: "{{ list_edge_table | edge_table }}"
-  #tags: [edge]
+  tags: [edge]
 
 - name: "SYS >> Creating Interface Table"
   copy:
