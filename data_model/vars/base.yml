@@ -1,0 +1,2 @@
+mgmt_ip_subnet: '10.10.108.0/24'
+domain: 'stesworld.com'

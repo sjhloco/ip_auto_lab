@@ -1,0 +1,15 @@
+# Default will be ospf 1 area0
+
+# Only scales to 4 spines, 10 leafs, 4 borders
+# SPINE-to-LEAF = eth1/1 - 1/10
+# SPINE-to-Border = eth1/11 - 1/15
+# LEAF-to-SPINE = eth1/1 - 1/5
+# Border-to-SPINE: = eth1/1 - 1/5
+
+num_spines: 2
+num_borders: 2
+num_leafs: 4
+
+lo_ip_subnet: '192.168.100.0/32'
+
+
