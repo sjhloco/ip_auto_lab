@@ -5,7 +5,7 @@ __metaclass__ = type
 # options match get_options and are actrually configuration (i.e. type, required, defalt)
 
 DOCUMENTATION = '''
-    name: leaf_spine
+    name: inv_from_vars
     plugin_type: inventory
     version_added: "2.8"
     short_description: Creates inventory from desired state
@@ -18,67 +18,42 @@ DOCUMENTATION = '''
         plugin:
             description: token that ensures this is a source file for the 'leaf_spine' plugin.
             required: True
-            choices: ['leaf_spine']
-        network_size:
-            description: Dictates the number of hosts created in the inventory
+            choices: ['inv_from_vars']
+        var_files:
+            description: Data-model in Ansible vars directory where dictionaries will imported from
             required: True
-            type: dict
-        names:
-            description: Format used to create the hostnames
-            type: dict
-            default: [{'spine_name': 'DC1-N9K-SPINE'}, {'border_name': 'DC1-N9K-BORDER'}, {'leaf_name': 'DC1-N9K-LEAF'}]
-        device_type:
-            description: Device type as used by NAPALM
-            type: dict
-            default: [{'spine_os': 'nxos'}, {'spine_os': 'nxos'}, {'spine_os': 'nxos'}]
-        addressing:
-            description: Subnets used to generate device specific IP addresses
+            type: list
+        var_dicts:
+            description: Dictionaries that wil be imported from the data-model
             required: True
-            type: dict
-        address_incre:
-            description: The increments used to make each device types IP unique
-            type: dict
-            default: [{'spine_ip': 10}, {'border_ip': 15}, {'leaf_ip': 20}]
+            type: list
+
 '''
 # What users see as away of instructions on how to run the plugin
 EXAMPLES = '''
-# leaf_spine_inventory.yml file in YAML format
-# Example command line: ansible-inventory -v --list -i leaf_spine_inventory.yml
-plugin: leaf_spine
+# inv_from_vars_cfg.yml file in YAML format
+# Example command line: ansible-inventory -v --list -i inv_from_vars_cfg.yml
+plugin: inv_from_vars
 
-# How many of each role of device are inventory entires created for
-network_size:
-  num_spines: 2
-  num_borders: 2
-  num_leafs: 4
+# Data-model in Ansible vars directory where dictionaries will imported from
+var_files:
+  - default.yml
+  - base.yml
+  - fabric.yml
 
-# Naming format for each host
-names:
-  spine_name: DC1-N9K-SPINE
-  border_name: DC1-N9K-BORDER
-  leaf_name: DC1-N9K-LEAF
-
-# Device type for each switch role (os)
-device_type:
-  spine_os: nxos
-  border_os: nxos
-  leaf_os: nxos
-
-# Address ranges devices IPs are created from
-addressing:
-  mgmt_ip_subnet: '10.10.108.0/24'
-  lo_ip_subnet: '192.168.100.0/32'
-
-# Network address increment used for each device role
-address_incre:
-  spine_ip: 10
-  border_ip: 15
-  leaf_ip: 20
+# Dictionaries that wil be imported from the data-model
+var_dicts:
+  - network_size                    # Naming format for each host
+  - device_name                     # Device type (os) for each switch type (group)
+  - device_type                     # Network address increment used for each device role (group)
+  - addressing                      # Address ranges the devices IPs are created from. Loopback must be /32
+  - address_incre                   # Dictates number of inventory objects created for each device role
 '''
-
 
 # ==================================== Plugin ==================================
 # Modules used to format date ready for creating the inventory
+import os
+import yaml
 from ipaddress import ip_network
 # Ansible modules required for the features of the inventory plugin
 from ansible.errors import AnsibleParserError
@@ -87,7 +62,7 @@ from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cachea
 
 # Ansible Inventory plugin class that holds pre-built methods that run automatically (verify_file, parse) without needing to be called
 class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
-    NAME = 'leaf_spine'     # Should match name of the plugin
+    NAME = 'inv_from_vars'     # Should match name of the plugin
 
 
 # ==================================== Verify config file ==================================
@@ -95,7 +70,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
     def verify_file(self, path):
         valid = False
         if super(InventoryModule, self).verify_file(path):
-            if path.endswith(('leaf_spine_src_cfg.yaml', 'leaf_spine_src_cfg.yml')):
+            if path.endswith(('inv_from_vars_cfg.yaml', 'inv_from_vars_cfg.yml')):
                 valid = True
         return valid
 
@@ -114,7 +89,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         while self.network_size['num_spines'] != 0:
             num += 1            # Increments by 1 for each device
             # Creates the name using the incremented (double-decimal format)
-            self.spine.append(self.names['spine_name'] + str("%02d" % num))
+            self.spine.append(self.device_name['spine_name'] + str("%02d" % num))
             # Creates the mgmt IP by adding the incr and device_ip_incr to the the network address
             self.hosts_mgmt.append(str(ip_network(self.addressing['mgmt_ip_subnet'], strict=False)[self.address_incre['spine_ip'] + num]))
             # Creates the loopback IP by adding the incr and device_ip_incr
@@ -125,7 +100,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         num = 0
         while self.network_size['num_borders'] != 0:
             num += 1
-            self.border.append(self.names['border_name'] + str("%02d" % num))
+            self.border.append(self.device_name['border_name'] + str("%02d" % num))
             self.hosts_mgmt.append(str(ip_network(self.addressing['mgmt_ip_subnet'], strict=False)[self.address_incre['border_ip'] + num]))
             self.hosts_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['border_ip'] + num))
             self.network_size['num_borders'] -= 1
@@ -134,7 +109,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         num = 0
         while self.network_size['num_leafs'] != 0:
             num += 1
-            self.leaf.append(self.names['leaf_name'] + str("%02d" % num))
+            self.leaf.append(self.device_name['leaf_name'] + str("%02d" % num))
             self.hosts_mgmt.append(str(ip_network(self.addressing['mgmt_ip_subnet'], strict=False)[self.address_incre['leaf_ip'] + num]))
             self.hosts_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['leaf_ip'] + num))
             self.network_size['num_leafs'] -= 1
@@ -145,10 +120,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
     def create_inventory(self):
 
         # Creates list of groups created from the device names
-        self.groups = [self.names['spine_name'].split('-')[-1].lower(), self.names['border_name'].split('-')[-1].lower(),
-                  self.names['leaf_name'].split('-')[-1].lower()]
+        groups = [self.device_name['spine_name'].split('-')[-1].lower(), self.device_name['border_name'].split('-')[-1].lower(),
+                  self.device_name['leaf_name'].split('-')[-1].lower()]
 
-        for gr in self.groups:
+        for gr in groups:
             # Creates all the group, they are automatically added to the 'all' group
             self.inventory.add_group(gr)
             # Creates the host entries and the os host_var (although assigned to group in the cmd)
@@ -165,9 +140,9 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                     self.inventory.add_host(sp, gr)
                     self.inventory.set_variable(gr, 'os', self.device_type['leaf_os'])
 
-        self.host_names = self.spine + self.border + self.leaf       # Create a new list of all hosts (names)
-        # Adds the mgmt and lp address as host_vars by using zip to iterate through 3 lists simultaneousl
-        for host, mgmt, lp in zip(self.host_names, self.hosts_mgmt, self.hosts_lp):
+        host_names = self.spine + self.border + self.leaf       # Create a new list of all hosts (names)
+        # Adds the mgmt and lp address as host_vars by using zip to iterate through 3 lists simultaneously
+        for host, mgmt, lp in zip(host_names, self.hosts_mgmt, self.hosts_lp):
             self.inventory.set_variable(host, 'ansible_host', mgmt)
             self.inventory.set_variable(host, 'lp_addr', lp)
 
@@ -175,46 +150,51 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 # ============================ Parse data from config file ==========================
 # !!!! The parse method is always auto-run, so is what starts the plugin and runs any custom methods !!!!
 
-    # 2. Pull the data from the config file and create variables for them.
+    # 2. This Ansible pre-defined method pulls the data from the config file and creates variables for it.
     def parse(self, inventory, loader, path, cache=False):
-        # super is normally the args that will be used when running parent meths, what does parse do????????????
-        super(InventoryModule, self).parse(inventory, loader, path)     # args come from Ansible class
+        # `Inherited methods: inventory creates inv, loader loads vars from cfg file and path is path to cfg file
+        super(InventoryModule, self).parse(inventory, loader, path)
 
-    # !!!!! ARE 2 ways to do this, not sure if either is better than the other so did both but use onyl 1 !!!!!!
-    # Opt1. Read all the data and create variables on the fly with get_option(). !!! Options MUST be defined in documentation options section !!!
+        # 2a. Read the data from the config file and create variables. !!! The options MUST be defined in documentation options section !!!
         self._read_config_data(path)
-        self.network_size = self.get_option('network_size')         # Creates a variable for each dictionary from the data model
-        self.names = self.get_option('names')
-        self.device_type = self.get_option('device_type')
-        self.addressing = self.get_option('addressing')
-        self.address_incre = self.get_option('address_incre')
+        var_files = self.get_option('var_files')           # List of the Ansible varaible files (in vars)
+        var_dicts = self.get_option('var_dicts')           # Names of the dictionaries that will be got from these files
 
-    # Opt2. Read all the data into a variable and then use get() to create varaibles for each part of the data model
-        # data = self._read_config_data(path)                   # Puts all the config options into a long dictionary
-        # self.network_size = data.get('network_size')          # Creates a variable for each dictionary from the data model
-        # self.names = data.get('names')
-        # self.device_type = data.get('device_type')
-        # self.addressing = data.get('addressing')
-        # self.address_incre = data.get('address_incre')
+        # 2b. Makes a dictionary of dictionaires holding contents of all files in format file_name:file_contents
+        all_vars = {}
+        mydir = os.getcwd()                 # Gets current directory
+        for name, file in zip(var_dicts.keys(), var_files):
+            with open(os.path.join(mydir, 'vars/') + file, 'r') as file_content:
+                all_vars[name] = yaml.load(file_content, Loader=yaml.FullLoader)
+
+        # 2c. Make the content more managable by splitting it up into file_name:dict_var nested dictionaries
+        # As it loops through list in cfg file is easy to add more variables in the future
+        for file_name, var_names in var_dicts.items():
+            for each_var in var_names:
+                if each_var == 'device_name':
+                    self.device_name = all_vars[file_name][each_var]
+                elif each_var == 'device_type':
+                    self.device_type = all_vars[file_name][each_var]
+                elif each_var == 'address_incre':
+                    self.address_incre = all_vars[file_name][each_var]
+                elif each_var == 'addressing':
+                    self.addressing = all_vars[file_name][each_var]
+                elif each_var == 'network_size':
+                    self.network_size = all_vars[file_name][each_var]
 
         self.create_objects()       # Run the method to turn the data model into inventory objects
         self.create_inventory()     # Run the method to to create the inventory
 
-        # Use test variables created from the data model or formatting to get elements from the dictionaries
+   # Example ways to test varaible format is correct before runnign other methods
         #test = self.addressing['lp_ip_subnet']
-        #test = config.get('names')[0]['spine_name']
+        #test = config.get('device_name')[0]['spine_name']
         #self.inventory.add_host(test)
-
 
     # To use error handling within the plugin use this format
         # try:
         #     cause_an_exception()
         # except Exception as e:
         #     raise AnsibleError('Something happened, this was original exception: %s' % to_native(e))
-
-
-
-
 
 
 

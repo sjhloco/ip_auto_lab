@@ -1,0 +1,22 @@
+# inv_from_vars_cfg.yml file in YAML format
+# Example command line: ansible-inventory -v --list -i inv_from_vars_cfg.yml
+plugin: inv_from_vars
+
+# Data-model in Ansible vars directory where dictionaries will be imported from
+var_files:
+  - default.yml
+  - base.yml
+  - fabric.yml
+
+#Dictionaries that will be imported from the varaible files in the vars directory
+var_dicts:
+  default:
+    - device_name
+    - device_type
+    - address_incre
+  base:
+    - addressing
+  fabric:
+    - network_size
+
+

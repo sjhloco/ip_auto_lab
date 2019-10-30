@@ -11,32 +11,3 @@
 
 
 
-##I need to pass int othe filter:
-
-# ipfabric.yml
-num_spine: 2
-num_border: 2
-num_leaf: 4
-lo_ip_subnet: '192.168.100.0/32'
-
-#base.yml
-mgmt_ip_subnet: '10.10.108.0/24'
-
-
-
-# defaults.yml
-spine_name: 'DC1-N9K-SPINE'
-border_name: 'DC1-N9K-BORDER'
-leaf_name: 'DC1-N9K-LEAF'
-
-spine_ip: 10
-border_ip: 15
-leaf_ip: 20
-
-
-
-
-      add_host:
-      name: "{{item.name}}"
-      group: devices
-    loop: "{{nodes}}"

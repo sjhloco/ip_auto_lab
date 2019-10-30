@@ -44,8 +44,12 @@ This is appraently the preferred method over scripts and it is slighlty easier a
 Problem is either dupliacte dat or 2 places as not pulling from my Ansible variables. This would need ot be changed
 Had to use ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)  as although stored in invetory_plugin dir in playbook dir, didnt work
 
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i leaf_spine_inventory.yml --graph			Just outputs all groups
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i leaf_spine_inventory.yml –list			Outputs all host_vars, groups and members
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i leaf_spine_inventory.yml –host DC1-N9K-SPINE01         	Outputs all host_vars for this specific host
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph			Just outputs all groups
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list			Outputs all host_vars, groups and members
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01         	Outputs all host_vars for this specific host
 
 
+!!!!! Notes
+The only things to go in host VARs are things that are node specific.
+Anything that is accross all does not get a host var
+May have to create group_vars for some things, not sure about that

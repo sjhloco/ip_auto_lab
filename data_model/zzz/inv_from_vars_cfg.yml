@@ -1,6 +1,6 @@
 # leaf_spine_inventory.yml file in YAML format
 # Example command line: ansible-inventory -v --list -i leaf_spine_inventory.yml
-plugin: leaf_spine
+plugin: inv_from_vars
 
 # How many of each role of device are inventory entires created for
 network_size:
@@ -9,7 +9,7 @@ network_size:
   num_leafs: 4
 
 # Naming format for each host
-names:
+device_name:
   spine_name: DC1-N9K-SPINE
   border_name: DC1-N9K-BORDER
   leaf_name: DC1-N9K-LEAF
