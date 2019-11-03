@@ -32,22 +32,26 @@ DOCUMENTATION = '''
 # What users see as away of instructions on how to run the plugin
 EXAMPLES = '''
 # inv_from_vars_cfg.yml file in YAML format
-# Example command line: ansible-inventory -v --list -i inv_from_vars_cfg.yml
+# Example command line: ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -v --list -i inv_from_vars_cfg.yml
 plugin: inv_from_vars
 
 # Data-model in Ansible vars directory where dictionaries will imported from
 var_files:
+  - ansible.yml
   - default.yml
   - base.yml
   - fabric.yml
 
 # Dictionaries that wil be imported from the data-model
 var_dicts:
-  - network_size                    # Naming format for each host
-  - device_name                     # Device type (os) for each switch type (group)
-  - device_type                     # Network address increment used for each device role (group)
-  - addressing                      # Address ranges the devices IPs are created from. Loopback must be /32
-  - address_incre                   # Dictates number of inventory objects created for each device role
+  ansible:
+    - device_type                   # Device type (os) for each switch type (group)
+  base:
+    - device_name                   # Naming format for each host
+    - addressing                    # Address ranges the devices IPs are created from. Loopback must be /32
+  fabric:
+    - network_size                  # Dictates number of inventory objects created for each device role
+    - address_incre                 # Network address increment used for each device role (group)
 '''
 
 # ==================================== Plugin ==================================
@@ -82,7 +86,12 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         self.border = []
         self.leaf = []
         self.hosts_mgmt = []
-        self.hosts_lp =[]
+        self.hosts_lp = []
+        self.hosts_sec_lp = []
+
+        # Halfs the the number of border and leaf switches which is used to create secondary loopback IP
+        half_num_borders = self.network_size['num_borders'] /2
+        half_num_leafs = self.network_size['num_leafs'] /2
 
         # 3a. Generate a lists of Spine switches, the management IPs and Loopback IPs
         num = 0
@@ -114,6 +123,20 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             self.hosts_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['leaf_ip'] + num))
             self.network_size['num_leafs'] -= 1
 
+        # 2d. Generate a list of secondary loopbacks to be used by each border and leaf VPC pair
+        num = 0
+        while half_num_borders != 0:
+            num += 1
+            # Adds the generated IP address twice as same IP used by both devices in VPC pair
+            self.hosts_sec_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['sec_border_lp'] + num))
+            self.hosts_sec_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['sec_border_lp'] + num))
+            half_num_borders -= 1
+        num = 0
+        while half_num_leafs != 0:
+            num += 1
+            self.hosts_sec_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['sec_leaf_lp'] + num))
+            self.hosts_sec_lp.append(str(ip_network(self.addressing['lp_ip_subnet'])[0] + self.address_incre['sec_leaf_lp'] + num))
+            half_num_leafs-= 1
 
 # ============================ Create the inventory ==========================
 # 4. Adds groups, hosts and varaibles to create the inventory file
@@ -146,6 +169,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             self.inventory.set_variable(host, 'ansible_host', mgmt)
             self.inventory.set_variable(host, 'lp_addr', lp)
 
+        # Adds the secondary loopback address variable to border and leaf switches
+        sec_hostnames = self.border + self.leaf       # list of just border and leafs
+        for host, sec_lp in zip(sec_hostnames, self.hosts_sec_lp):
+            self.inventory.set_variable(host, 'sec_lp_addr', sec_lp)
 
 # ============================ Parse data from config file ==========================
 # !!!! The parse method is always auto-run, so is what starts the plugin and runs any custom methods !!!!

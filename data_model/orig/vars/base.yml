@@ -1,8 +1,0 @@
-# !!! Description of what settings are in here !!!
-
-addressing:
-  lp_ip_subnet: '192.168.100.0/32'
-  mgmt_ip_subnet: '10.10.108.0/24'
-
-
-domain: 'stesworld.com'

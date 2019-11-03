@@ -1,8 +1,16 @@
-# !!! Description of what settings are in here !!!
+---
+################ Variables used to create core elements of the device configs ################
 
+# Hostname: What is that added before the node number. Groups are created based on name (i.e spine, broder, leaf)
+device_name:                            # These can be changed to anything as actual name not used in scritping logic
+  spine_name: 'DC1-N9K-SPINE'
+  border_name: 'DC1-N9K-BORDER'
+  leaf_name: 'DC1-N9K-LEAF'
+
+# Ranges from which addresses are created from. Must have the mask in prefix format (/)
 addressing:
-  lp_ip_subnet: '192.168.100.0/32'
-  mgmt_ip_subnet: '10.10.108.0/24'
-
+  lp_ip_subnet: '192.168.100.0/32'      # By default will use .10 to .37
+  mgmt_ip_subnet: '10.10.108.0/24'      # Needs to be at least /27 to cover max spine (4), leafs (10) and borders (4)
+  vpc_peer_subnet: '10.254.254.0/28'    # Needs to be at least /28 to cover max leafs (10) and borders (4)
 
 domain: 'stesworld.com'

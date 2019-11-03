@@ -1,0 +1,96 @@
+tenants & vlans
+
+vrf context prod
+  vni 90001
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+
+interface Vlan10
+  no shutdown
+  vrf member prod
+  no ip redirects
+  ip address 10.10.10.1/24 tag 12345
+  no ipv6 redirects
+  fabric forwarding mode anycast-gateway
+
+interface Vlan11
+  no shutdown
+  vrf member prod
+  no ip redirects
+  ip address 10.10.11.1/24 tag 12345
+  no ipv6 redirects
+  fabric forwarding mode anycast-gateway
+
+interface Vlan12
+  no shutdown
+  vrf member prod
+  no ip redirects
+  ip address 10.10.12.1/24 tag 12345
+  no ipv6 redirects
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  no shutdown
+  vrf member prod
+  no ip redirects
+  ip address 10.10.20.1/24 tag 12345
+  no ipv6 redirects
+  fabric forwarding mode anycast-gateway
+
+
+interface nve1
+  member vni 10010-10012
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 10020
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 10050
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 10051
+    suppress-arp
+    ingress-replication protocol bgp
+  member vni 90001 associate-vrf
+
+router BGP xxxx
+  vrf prod
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+      redistribute direct route-map REDIST-L2VNI_SVI
+evpn
+  vni 10010 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10011 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10012 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10020 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10050 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+  vni 10051 l2
+    rd auto
+    route-target import auto
+    route-target export auto
+
+server_ports
+
+
+
+
+bgp_peerings
+
+

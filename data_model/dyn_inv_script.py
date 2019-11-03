@@ -15,30 +15,33 @@ except ImportError:
 # ./dyn_inv_script.py --help                               See all the argunments possible
 # ./dyn_inv_script.py --list                               Print to screen all groups, members and vars
 # ./dyn_inv_script.py --host DC1-N9K-BORDER02              Print to screen all host_vars for a specific host
-# ansible all -i dyn_inv_script.py -m ping                 Ansible logs into all hosts from specified invetory grp and pings
-# ansible-playbook my_playbook.yml -i ./dyn_inv_script.py	Run the playbook using the dynamic inventory
+# ansible-playbook playbook.yml -i dyn_inv_script.py	    Run the playbook using the dynamic inventory
 
 
 # ============================ Generates host details from data models ==========================
 def gather_details():
-    global spine, border, leaf, hosts_mgmt, hosts_lp, groups, spine_os, border_os, leaf_os   # Needed so these varaibles can be used in other functions
+    global spine, border, leaf, hosts_mgmt, hosts_lp, hosts_sec_lp, groups, spine_os, border_os, leaf_os   # Needed so these varaibles can be used in other functions
 
     # 2. Load the data models (as a nested dict) from Ansible variable files (yml)
     mydir = os.getcwd()     # Gets current directory
-    with open(os.path.join(mydir, 'vars/') + 'defaults.yml', 'r') as x:
-        defaults = yaml.load(x, Loader=yaml.FullLoader)
+    with open(os.path.join(mydir, 'vars/') + 'ansible.yml', 'r') as x:
+        ansible = yaml.load(x, Loader=yaml.FullLoader)
     with open(os.path.join(mydir, 'vars/') + 'base.yml', 'r') as y:
         base = yaml.load(y, Loader=yaml.FullLoader)
     with open(os.path.join(mydir, 'vars/') + 'fabric.yml', 'r') as z:
         fabric = yaml.load(z, Loader=yaml.FullLoader)
 
-    device_name = defaults['device_name']
-    address_incre = defaults['address_incre']
-    device_type = defaults['device_type']
+    # Creates python variables from the var file objects
+    device_name = base['device_name']
+    address_incre = fabric['address_incre']
+    device_type = ansible['device_type']
     addressing = base['addressing']
     network_size = fabric['network_size']
+    # Halfs the the number of border and leaf switches which is used to create secondary loopback IP
+    half_num_borders = network_size['num_borders'] /2
+    half_num_leafs = network_size['num_leafs'] /2
 
-    spine, border, leaf, hosts_mgmt, hosts_lp = ([] for i in range(5))    # creates 5 new lists
+    spine, border, leaf, hosts_mgmt, hosts_lp, hosts_sec_lp = ([] for i in range(6))    # creates 5 new lists
 
     # 2a. Generate a lists of Spine switches from the data model
     num = 0
@@ -70,6 +73,21 @@ def gather_details():
         hosts_lp.append(str(ip_network(addressing['lp_ip_subnet'])[0] + address_incre['leaf_ip'] + num))
         network_size['num_leafs'] -= 1
 
+    # 2d. Generate a list of secondary loopbacks to be used by each border and leaf VPC pair
+    num = 0
+    while half_num_borders != 0:
+        num += 1
+        # Adds the generated IP address twice as same IP used by both devices in VPC pair
+        hosts_sec_lp.append(str(ip_network(addressing['lp_ip_subnet'])[0] + address_incre['sec_border_lp'] + num))
+        hosts_sec_lp.append(str(ip_network(addressing['lp_ip_subnet'])[0] + address_incre['sec_border_lp'] + num))
+        half_num_borders -= 1
+    num = 0
+    while half_num_leafs != 0:
+        num += 1
+        hosts_sec_lp.append(str(ip_network(addressing['lp_ip_subnet'])[0] + address_incre['sec_leaf_lp'] + num))
+        hosts_sec_lp.append(str(ip_network(addressing['lp_ip_subnet'])[0] + address_incre['sec_leaf_lp'] + num))
+        half_num_leafs-= 1
+
     # Creates list of groups (from the device names) and the os variable to be used in next function
     groups = [device_name['spine_name'].split('-')[-1].lower(), device_name['border_name'].split('-')[-1].lower(),
               device_name['leaf_name'].split('-')[-1].lower()]
@@ -94,16 +112,17 @@ def group_info(groups, spine, border, leaf, hosts_mgmt, os):
         elif gr == 'leaf':
             inventory.update({gr: {"hosts": leaf, "vars": {'os': leaf_os}}})
 
-    # inventory.update({groups[0]: { "hosts": spine, "vars": {'os': 'nxos'}}})
-    # inventory.update({groups[1]: { "hosts": border, "vars": {'os': 'nxos'}}})
-    # inventory.update({groups[2]: { "hosts": leaf, "vars": {'os': 'nxos'}}})
-
 # 4. Create the hosts and populate with the host_vars
 def host_info(inventory, hostnames, hosts_mgmt):
     inventory['_meta'] = {'hostvars': {}}           # Adds a new key:value pair to dict
     for host, mgmt, lp in zip(hostnames, hosts_mgmt, hosts_lp):   # Uses zip to iterate therough 3 lists simultaneously
         # Adds a new key that is the host with the value being the host_var key:value pair
         inventory['_meta']['hostvars'][host] = {'ansible_host': mgmt, 'lp_addr': lp}
+
+    # Adds the secondary loopback address variable to border and leaf switches
+    sec_hostnames = border + leaf       # list of just border and leafs
+    for host, sec_lp in zip(sec_hostnames, hosts_sec_lp):
+        inventory['_meta']['hostvars'][host]['sec_lp_addr'] = sec_lp
 
 def empty_inventory():
     return {'_meta': {'hostvars': {}}}
@@ -122,8 +141,10 @@ def main():
 
     if cli_args.list:           # if list print group_vars
         pprint(inventory)
+        pass
     elif cli_args.host:         # if host print that hosts host_var
         pprint(inventory['_meta']['hostvars'][cli_args.host])
+        pass
     else:                       # if no input return group_var and host_var as a JSON
         return(json.dumps(inventory))
 

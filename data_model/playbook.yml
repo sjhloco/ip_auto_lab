@@ -1,13 +1,36 @@
-- hosts: localhost
-  gather_facts: no
+---
+# This playbook is used to generate the different configuration snippets
+
+# 1. Create the file structure
+- name: "Create file structure"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
   tasks:
-  - name: "SYS >> Pass through Python Filter"
-    set_fact:     # Passes output through filter with bgp_neigh variable
-      bgp_table: "{{ bgp_output.ansible_facts | bgp_filter(inventory_hostname, bgp_neigh) }}"
-    changed_when: False
-  tags: [bgp]
-  when: os == 'nxos'
+  - block:
+    - name: "SYS >> Delete the directory"
+      file: path="{{ dir_path }}" state=absent
+      changed_when: False
+    - name: "Creating file structure"
+      file: path="{{ dir_path }}/{{ inventory_hostname }}" state=directory
+      changed_when: False
+    check_mode: False
+    tags: dir
 
-
-
-
+# 2. Create the fabric config snippets using fabric_template.j2
+- name: "SYS >> Create fabric config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+    - vars/fabric.yml
+  tasks:
+  - name: "SYS >> Create config snippets"
+    template:
+      src: fabric_template.j2
+      dest: "{{ dir_path }}/{{ inventory_hostname }}/fabric.cfg"
+  # - debug:
+  #     var: vpc.peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+vpc.peer_incre.border)
+    tags: fabric

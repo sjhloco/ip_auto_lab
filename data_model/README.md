@@ -53,3 +53,10 @@ ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from
 The only things to go in host VARs are things that are node specific.
 Anything that is accross all does not get a host var
 May have to create group_vars for some things, not sure about that
+
+Sometimes when run playbook wiht full ammount it skips one, for exampel fails to make the directory so have to rerun - Guess is forks????
+Still dont know how can create complete config out of it with my formatting as config has to be in order (i.e. all interfaces together)
+Need to decide on where defaults go, do we just put in with same section are defaults for and sperate file???
+How do you add services int he future, have a playbook that edits the variable fiels
+Need to build in some type of IP checking
+Need to integrate IPAM, either use that to assign IPs, or check agaisnt it and update when deploy the fabric
