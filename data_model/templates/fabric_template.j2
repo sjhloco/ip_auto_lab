@@ -85,7 +85,7 @@ router bgp {{ bgp_settings.as_num }}
     advertise-pip
 {% endif %}
     retain route-target all
-  template peer FABRIC-PEERING
+  template peer FABRIC_PEERING
     remote-as 65001
     update-source loopback0
     timers 3 9
@@ -110,13 +110,13 @@ router bgp {{ bgp_settings.as_num }}
 {% for x in groups['leaf'] %}
   neighbor {{ hostvars[x]['lp_addr']}}
     description {{ x }}
-    inherit peer FABRIC-PEERING
+    inherit peer FABRIC_PEERING
 {% endfor %}
 {# loop through the leaf group and get loopback hostvar #}
 {% for x in groups['border'] %}
   neighbor {{ hostvars[x]['lp_addr']}}
     description {{ x }}
-    inherit peer FABRIC-PEERING
+    inherit peer FABRIC_PEERING
 {% endfor %}
 {### Create the border and leaf peers based on members of Ansible spine groups ###}
 {% else %}
@@ -124,7 +124,7 @@ router bgp {{ bgp_settings.as_num }}
 {% for x in groups['spine'] %}
   neighbor {{ hostvars[x]['lp_addr']}}
     description {{ x }}
-    inherit peer FABRIC-PEERING
+    inherit peer FABRIC_PEERING
 {% endfor %}
 {% endif %}
 

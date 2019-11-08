@@ -1,0 +1,46 @@
+---
+################ Services Delivered by the Fabric only on border switches ################
+
+###################### Service: BGP Peerings (Non-EVPN) ######################
+# This is only for BGP peerings off the border
+
+#### Base variables ####
+srv_bgp_settings:
+  - name:                                   # Short name used in descritpion and RM
+    tenant:                                 # what address-family to create this under
+    remote_as:                              # Neighbor AS
+    allowed_in:                             # any or network/prefix seperated by comma. If blank deny all
+    allowed_out:                            # any or network/prefix seperated by comma. If blank deny all
+
+#### Advanced variables ####
+
+srv_bgp_default:
+  maximum-paths:
+  rm_in_naming:
+  rm_out_naming:
+  pl_in_naming:                           # Only created if dont use deny or allow all
+  pl_out_naming:                          # Only created if dont use deny or allow all
+  timers: 3 9
+
+# bestpath as-path multipath-relax
+
+
+###################### Service: OSPF Neighbors (Non-backbone process) ######################
+# This is only for non-backbone OSPF neighbors off the border
+
+#### Base variables ####
+srv_ospf_setting:
+  ospf_pro: 1
+  ospf_area: 0.0.0.0
+  rid:
+  interfaces:
+
+
+srv_ospf_default:
+  default_orig: no
+  redist_in:
+  redist_out:
+  allowed_in:
+  allowed_out:
+
+  # advertise l2vpn evpn
