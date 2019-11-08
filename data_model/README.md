@@ -60,3 +60,6 @@ Need to decide on where defaults go, do we just put in with same section are def
 How do you add services int he future, have a playbook that edits the variable fiels
 Need to build in some type of IP checking
 Need to integrate IPAM, either use that to assign IPs, or check agaisnt it and update when deploy the fabric
+
+Ordering things by number, for example nve interface. NXOS autoamtically reorders s, need to make my config exact
+Gets lengthy as have to keep splitting logic up to keep order corrrect (as did to lkeep NVE interface)

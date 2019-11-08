@@ -34,3 +34,29 @@
   # - debug:
   #     var: vpc.peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+vpc.peer_incre.border)
     tags: fabric
+
+# 2. Create the fabric config snippets using fabric_template.j2
+- name: "SYS >> Create services config snippets"
+  hosts: all
+  connection: local
+  vars_files:               # !!! WHY DOES IT FAIL IF I DONT HAVE ALL VAR FILES IN HERE, should only need services !!!
+    - vars/ansible.yml
+    - vars/base.yml
+    - vars/fabric.yml
+    - vars/services.yml
+  tasks:
+  - block:
+    - name: "SYS >> Use Python to create complete data-model"
+      set_fact:
+        tenants_dm: "{{ tenants |tenants_dm(base_vni) }}"   # Completes data-model with VNI
+        ports_dm: "{{ ports |ports_dm(default_int, tenants) }}"      # Completes data-model with interface & PO/VPC
+      changed_when: false
+      run_once: true
+    - name: "SYS >> Create config snippets"
+      template:
+        src: services_template.j2
+        dest: "{{ dir_path }}/{{ inventory_hostname }}/services.cfg"
+      changed_when: false
+    # - debug:
+    #     var: ports_dm
+    tags: services
