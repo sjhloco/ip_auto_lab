@@ -63,3 +63,11 @@ Need to integrate IPAM, either use that to assign IPs, or check agaisnt it and u
 
 Ordering things by number, for example nve interface. NXOS autoamtically reorders s, need to make my config exact
 Gets lengthy as have to keep splitting logic up to keep order corrrect (as did to lkeep NVE interface)
+
+Hvae ended up with more duplicate date, like for exampel VRFs
+
+Got oput of control, too many duplicate data
+Need better naming for the variables to know what file there from
+Need better naming to know if they came from python plugin filter
+Probably need to put all var files though python to create the full data-model, will make the  jinja2 neater
+-provides a layer of abstraction - keep jinja very simple, less nested for and if statements

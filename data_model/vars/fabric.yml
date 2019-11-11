@@ -8,7 +8,7 @@
 # How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in VPC pair
 network_size:
   num_spines: 0
-  num_borders: 2
+  num_borders: 4
   num_leafs: 2
 
 # To change Fabric routing protocol settings

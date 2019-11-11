@@ -11,6 +11,7 @@ device_name:                            # These can be changed to anything as ac
 addressing:
   lp_ip_subnet: '192.168.100.0/32'      # By default will use .10 to .37
   mgmt_ip_subnet: '10.10.108.0/24'      # Needs to be at least /27 to cover max spine (4), leafs (10) and borders (4)
-  vpc_peer_subnet: '10.254.254.0/28'    # Needs to be at least /28 to cover max leafs (10) and borders (4)
+  vpc_peer_subnet: '10.255.255.0/28'    # Needs to be at least /28 to cover max leafs (10) and borders (4)
+  srv_ospf_subnet: '10.255.255.16/28'   # Used for OSPF process peerings between border switches (4 addresses per OSPF process)
 
 domain: 'stesworld.com'

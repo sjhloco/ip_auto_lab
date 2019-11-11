@@ -5,18 +5,18 @@ from ipaddress import ip_network
 class FilterModule(object):
     def filters(self):
         return {
-            'tenants_dm': self.tenants_dm,
-            'ports_dm': self.ports_dm
+            'srv_tenants_dm': self.srv_tenants_dm,
+            'srv_ports_dm': self.srv_ports_dm
         }
 
  # Create a new tenants data model including VNI info
-    def tenants_dm(self, tenants, base_vni):
+    def srv_tenants_dm(self, srv_tenants, base_vni):
         # Create variables from imported nested variables
         l3vni = base_vni['l3vni']
         tn_vlan = base_vni['tn_vlan']
         l2vni = base_vni['l2vni']
 
-        for tn in tenants:
+        for tn in srv_tenants:
             # If a tenant is L3 (has VRF) adds the VLAN and L3VNI for it to the dictionary
             if tn['l3_tenant'] is True:
                 tn['l3vni'] = l3vni
@@ -30,52 +30,45 @@ class FilterModule(object):
             # For each tenant increments the L2VNI by 10000
             l2vni = l2vni + 10000
 
-        return tenants
+        # If any SVIs are redistrbuted into BGP creates the new tenant 'redist' dictionary
+        for tn in srv_tenants:
+            if tn['l3_tenant'] is True:
+                for vl in tn['vlans']:
+                    if vl['ipv4_bgp_redist'] == True:
+                        tn['redist'] = True
+
+        # Dictionary returned back to Ansible
+        return srv_tenants
 
  # Create a new ports data model including interface and Po info
-    def ports_dm(self, ports, default_int, tenants):
+    def srv_ports_dm(self, srv_ports, srv_ports_adv, srv_tenants):
         ### 1. First need to create seperate lists for single and dual homed so can use loop index to increment interafce number ###
         sh_ports = []
         dh_ports = []
         # Split the single and dual homed start interface into a list of two elements (port type and number)
-        sh_first = default_int['single_homed']['first_int'].split('/')
-        dh_first = default_int['dual_homed']['first_int'].split('/')
+        sh_first = srv_ports_adv['single_homed']['first_int'].split('/')
+        dh_first = srv_ports_adv['dual_homed']['first_int'].split('/')
 
         ### 1. Use iteration number (index) to increment interface and add to the dictionary
         # Create single-homed interfaces
-        for index, port in enumerate(ports['single_homed']):
+        for index, port in enumerate(srv_ports['single_homed']):
             int_num = str(int(sh_first[1]) + index)                     # Adds the index to the start port number
             port['interface'] = sh_first[0] + '/' + int_num             # Creates a new dict element for interface number
-            # A bit horrible, but used to get the VRF name based on the IP address given
-            if port['port_type'] == 'layer3':
-                for tn in tenants:
-                    if tn['l3_tenant'] is True:
-                        for vl in tn['vlans']:
-                            if vl['ip_addr'] != 'none':
-                                if ip_network(port['port_variable'], strict=False) == ip_network(vl['ip_addr'], strict=False):
-                                    port['vrf'] = tn['tenant_name']
             sh_ports.append(port)                                   # Adds all single-homed port dictonaries to a list
 
         # Create dual-homed interfaces,POs and VPC
-        for index, port in enumerate(ports['dual_homed']):
+        for index, port in enumerate(srv_ports['dual_homed']):
             int_num = str(int(dh_first[1]) + index)
             port['interface'] = dh_first[0] + '/' + int_num             # Used 2 different ways to add to dictionary, could have used either
-            port.update({'vpc': default_int['dual_homed']['vpc'] + index, 'po': default_int['dual_homed']['po'] + index})
-            if port['port_type'] == 'layer3':
-                for tn in tenants:
-                    if tn['l3_tenant'] is True:
-                        for vl in tn['vlans']:
-                            if vl['ip_addr'] != 'none':
-                                if ip_network(port['port_variable'], strict=False) == ip_network(vl['ip_addr'], strict=False):
-                                    port['vrf'] = tn['tenant_name']
+            port.update({'vpc': srv_ports_adv['dual_homed']['vpc'] + index, 'po': srv_ports_adv['dual_homed']['po'] + index})
             dh_ports.append(port)                                   # Adds all dual-homed port dictonaries to a list
 
         ### 2. FAIL-FAST: Only return new dictionaires if havent reached the interface limit
         num_sh = []
         num_dh = []
         # Works out the max number of interfaces that would be available
-        sh_limit = int(default_int['single_homed']['last_int'].split('/')[1]) - int(sh_first[1]) + 1
-        dh_limit = int(default_int['dual_homed']['last_int'].split('/')[1]) - int(dh_first[1]) + 1
+        sh_limit = int(srv_ports_adv['single_homed']['last_int'].split('/')[1]) - int(sh_first[1]) + 1
+        dh_limit = int(srv_ports_adv['dual_homed']['last_int'].split('/')[1]) - int(dh_first[1]) + 1
 
         # Gets switch names from port dictionaries
         for sh_swi in sh_ports:

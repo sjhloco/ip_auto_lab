@@ -1,1 +1,16 @@
-ports: test
+---
+### TEMP ###
+
+bgp_settings:
+  as_num: 65001
+
+tenants_dm:
+  - tenant_name: prod
+    l3vni: 3001
+  - tenant_name: acme
+    l3vni: 3002
+
+bgp_options:
+  ipv4_redist_rm_name: rm_CONN_VRF>>BGP     # Can change route-map name, but it MUST still include VRF in the text
+  # ipv4_redist_tag:
+
