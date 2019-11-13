@@ -30,7 +30,7 @@ These core elements are what is required to make this declarative and are used f
 - *num_borders: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 4
 - *num_leafs: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 10
 
-*address_incre:* # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses. Different increments are used dependant on the device role to keep the addresses unique. The below IP addesses are based on the default values.
+*address_incre:* # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses. Different increments are used dependant on the device role to keep the addresses unique. The below IP addesses are based on the default values
 - *spine_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spine IP addresses will be from .11 to .14
 - *border_ip: 15* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Border IP addresses will be from .16 to .19
 - *leaf_ip: 20* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Leaf IP addresses will be from .21 to .30
@@ -60,8 +60,8 @@ These core elements are what is required to make this declarative and are used f
 **fabric.yml -** The variables that decide the size of the network and how the physical fabric topology will look. Although the majority of these options can be left the same the data models are included to provide additonal nerd knobs to further customize the setup if required.
 
 - *network_size:*  How big the network is, the number of switches per network role (see core elements)
-- *fbc:* The core routing options such as OSPF process, area and BGP AS number.
-- *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for the different device inter-connects (e.g. spine to leafs).
+- *fbc:* The core routing options such as OSPF process, area and BGP AS number
+- *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for the different device inter-connects (e.g. spine to leafs)
 - *fbc_vpc:* VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
 - *address_incre:* Increment used to ensure that all device IP addresses are unique (see core elements)
 
