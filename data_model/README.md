@@ -1,62 +1,32 @@
-# Dynamic Inventory
+# Data Models - Deploy Leaf and Spine
 
-Not sure which method will use yet so have tried all 3 types.
+The idea behind these data models is to deploy a leaf and spine architecture and its related services in a declarative manner. A dynamic inventory is created using either an inventory plugin or dynamic inventory script based on the information within the data models. Unless specifically stated all the elements of the data model can be changed as the none of the scripting or templating uses the actual contents to make decisions.
 
-<br/> Option1: dyn_inv_script.py - A dynamic inventory script that is run with ansible cmd.
-The following data-model elements are used to create the inventory
+There are no external hookins with these data models so the device configuration is generated solely from the contents of the data models
 
-os = defaults['os']         Device type that will be used by NAPALM
-base['mgmt_ip_subnet']      Network address device IP addresss are created from
+## Data Models
+**ansible.yml -** Contains the login and Ansible settings that would normally be stored in *all.yml*. The reason I dont use  *group_vars* is that the inventory plugin would add each variable in *all.yml* to every devices *host_var*.
 
-ipfabric['num_spines']      Number of spine switches. Decremented in a loop to create device Bame and IP
-defaults['spine_name']      Basis used to create the spines hostname
-defaults['spine_ip']        A set value by which to increment the network address for these device types
-Have the same 3 elements for border and leaf switches
+- *ansible_python_interpreter:* Python location on the Ansible host (operating system specific)           
+- *dir_path:* Base directory Location to store the generated configuration snippets
+- *creds_all:* User credentials for connecting to devices
+- *device_type:* Operating system of each device type (Spine, Leaf and Border)
 
-The script can be run using any of these cmds
-*./dyn_script.py --help*                                   See all the argunments possible
-*./dyn_script.py --list*                                   Print to screen all groups, members and vars
-*./dyn_script.py --host DC1-N9K-BORDER02*                  Print to screen all host_vars for a specific host
-*ansible all -i dyn_script.py -m ping*                     Ansible logs into all hosts from specified invetory grp and pings
-*ansible-playbook my_playbook.yml -i ./dyn_script.py*	    Run the playbook using the dynamic inventory
+**base.yml -** These varaibles are used for creating the devices base configuration, so contains things such as naming, IP addressing, users, syslog, aaa, ACLs, etc. The naming format and addressing subnets are used by the inventory and all other templates as are part of the 5 core elements needed to make this declaritive.
 
-<br/> Option2: leaf_spine.py - An inventory plugin that uses the source config file leaf_spine_src_cfg.yml
-The uses the same data-model elements are used except also has loopback subnet and they are stored as dictionaries:
-Once again only spine has been shown for brevity
-
-network_size:
-  num_spines: 2
-
-names:
-  spine_name: DC1-N9K-SPINE
-
-device_type:
-  spine_os: nxos
-
-addressing:
-  mgmt_ip_subnet: '10.10.108.0/24'
-  lp_ip_subnet: '192.168.100.0/32'
-
-address_incre:
-  spine_ip: 10
-
-This is appraently the preferred method over scripts and it is slighlty easier as is already structured using Ansible class and methods.
-Problem is either dupliacte dat or 2 places as not pulling from my Ansible variables. This would need ot be changed
-Had to use ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)  as although stored in invetory_plugin dir in playbook dir, didnt work
-
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph			Just outputs all groups
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list			Outputs all host_vars, groups and members
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01         	Outputs all host_vars for this specific host
+- *device_name:* Naming format for hostname (see core elements for more details)
+- *addressing:* Subnets from which device addressing is generated (see core elements for more details)
+- *bse.users:* List of device usernames
+- *bse_services:* Dictionary of services consumed by the device such as dns, syslog, tacacs, snmp and logging
+- *bse_acl:* Management ACLs for things such as snmp and ssh access
+- *base_adv:* Configuration elements less likely to change such as the image and exec-timeout
 
 
-!!!!! Notes
-The only things to go in host VARs are things that are node specific.
-Anything that is accross all does not get a host var
-May have to create group_vars for some things, not sure about that
 
-Sometimes when run playbook wiht full ammount it skips one, for exampel fails to make the directory so have to rerun - Guess is forks????
-Still dont know how can create complete config out of it with my formatting as config has to be in order (i.e. all interfaces together)
-Need to decide on where defaults go, do we just put in with same section are defaults for and sperate file???
-How do you add services int he future, have a playbook that edits the variable fiels
-Need to build in some type of IP checking
-Need to integrate IPAM, either use that to assign IPs, or check agaisnt it and update when deploy the fabric
+
+
+
+
+
+
+
