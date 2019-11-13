@@ -22,7 +22,7 @@ These core elements are what is required to make this declarative and are used f
 - *lp_ip_subnet: 'x.x.x.x/32'* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Core OSPF and BGP peerings. By default will use .10 to .37
 - *mgmt_ip_subnet: 'x.x.x.x/27'* &nbsp;&nbsp;&nbsp; Needs to be at least /27 to cover max spine (4), leafs (10) and borders (4)
 - *vpc_peer_subnet: 'x.x.x.x/28'* &nbsp;&nbsp; VPC peer-link addresses. At least /28 to cover max leafs (10) and borders (4)
-- *srv_ospf_subnet: 'x.x.x.x/28'* &nbsp;&nbsp;&nbsp; Non-core OSPF process peerings between border switches (4 IPs per-OSPF process)
+- *srv_ospf_subnet: 'x.x.x.x/28'* &nbsp;&nbsp;&nbsp; Non-core OSPF process peerings between borders (4 IPs per-OSPF process)
 
 **fabric.yml**
 <br/>*network_size:* How big the network is, so the number of each switch type. border/leaf must be in increments of 2 as are in a VPC pair.
