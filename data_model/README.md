@@ -30,7 +30,15 @@ These core elements are what is required to make this declarative and are used f
 - *num_borders: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 4
 - *num_leafs: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 10
 
-*address_incre:*
+*address_incre:* # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses. Different increments are used dependant on the device role to keep the addresses unique. The below IP addesses are based on the default values.
+- *spine_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spine IP addresses will be from .11 to .14
+- *border_ip: 15* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Border IP addresses will be from .16 to .19
+- *leaf_ip: 20* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Leaf IP addresses will be from .21 to .30
+- *sec_leaf_lp: 30* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of Leaf secondary loopback IP addresses will be from .31 to .35
+- *sec_border_lp: 35* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of BORDER secondary loopback addresses will be from .36 to .37
+- *vpc_leaf_ip: 0* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 .2, Leaf3 .3, etc
+- *vpc_border_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Border Peer Links, so Border1 is .11, BorderR2 .12, etc
+
 
 ## Data Models
 **ansible.yml -** Contains the login and Ansible settings that would normally be stored in *all.yml*. The reason I dont use  *group_vars* is that the inventory plugin would add each variable in *all.yml* to every devices *host_var*.
