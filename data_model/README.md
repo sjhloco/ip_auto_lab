@@ -62,8 +62,8 @@ These core elements are what is required to make this declarative and are used f
 - *network_size:*  How big the network is, the number of switches per network role (see core elements)
 - *fbc:* The core routing options such as OSPF process, area and BGP AS number.
 - *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for the different device inter-connects (e.g. spine to leafs).
-- *fbc_vpc: VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
-- *address_ince: Increment used to ensure that all device IP addresses are unique (see core elements)
+- *fbc_vpc:* VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
+- *address_incre:* Increment used to ensure that all device IP addresses are unique (see core elements)
 
 **services.yml -**
 
