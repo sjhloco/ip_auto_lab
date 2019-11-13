@@ -5,7 +5,7 @@ The idea behind these data models is to deploy a leaf and spine architecture and
 This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but if need be can be done so within *fabric.yml*.
 - SPINE-to-LEAF = Eth1/1 - 1/10     
 - SPINE-to-Border = Eth1/11 - 1/15
-- BORDER-to-SPINE: = Eth1/1 - 1/5
+- BORDER-to-SPINE = Eth1/1 - 1/5
 - LEAF-to-SPINE = Eth1/1 - 1/5      
 - VPC Peer-link = Eth1/127 - 128
 
@@ -31,13 +31,13 @@ These core elements are what is required to make this declarative and are used f
 - *num_leafs: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 10
 
 *address_incre:* # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses. Different increments are used dependant on the device role to keep the addresses unique. The below IP addesses are based on the default values.
-- *spine_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spine IP addresses will be from .11 to .14
-- *border_ip: 15* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Border IP addresses will be from .16 to .19
-- *leaf_ip: 20* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Leaf IP addresses will be from .21 to .30
-- *sec_leaf_lp: 30* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of Leaf secondary loopback IP addresses will be from .31 to .35
-- *sec_border_lp: 35* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of BORDER secondary loopback addresses will be from .36 to .37
-- *vpc_leaf_ip: 0* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 .2, Leaf3 .3, etc
-- *vpc_border_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Border Peer Links, so Border1 is .11, BorderR2 .12, etc
+- *spine_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spine IP addresses will be from .11 to .14
+- *border_ip: 15* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Border IP addresses will be from .16 to .19
+- *leaf_ip: 20* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Leaf IP addresses will be from .21 to .30
+- *sec_leaf_lp: 30* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of Leaf secondary loopback IP addresses will be from .31 to .35
+- *sec_border_lp: 35* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of BORDER secondary loopback addresses will be from .36 to .37
+- *vpc_leaf_ip: 0* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 is .2, Leaf3 is .3, etc
+- *vpc_border_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Border Peer Links, so Border1 is .11, Border2 is .12, etc
 
 
 ## Data Models
@@ -50,16 +50,22 @@ These core elements are what is required to make this declarative and are used f
 
 **base.yml -** These varaibles are used for creating the devices base configuration, so contains things such as naming, IP addressing, users, syslog, aaa, ACLs, etc. The naming format and addressing subnets are used by the inventory and all other templates as are part of the 5 core elements needed to make this declaritive.
 
-- *device_name:* Naming format for hostname (see core elements for more details)
-- *addressing:* Subnets from which device addressing is generated (see core elements for more details)
+- *device_name:* Naming format for hostname (see core elements)
+- *addressing:* Subnets from which device addressing is generated (see core elements)
 - *bse.users:* List of device usernames
 - *bse_services:* Dictionary of services consumed by the device such as dns, syslog, tacacs, snmp and logging
 - *bse_acl:* Management ACLs for things such as snmp and ssh access
 - *base_adv:* Configuration elements less likely to change such as the image and exec-timeout
 
+**fabric.yml -** The variables that decide the size of the network and how the physical fabric topology will look. Although the majority of these options can be left the same the data models are included to provide additonal nerd knobs to further customize the setup if required.
 
+- *network_size:*  How big the network is, the number of switches per network role (see core elements)
+- *fbc:* The core routing options such as OSPF process, area and BGP AS number.
+- *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for the different device inter-connects (e.g. spine to leafs).
+- *fbc_vpc: VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
+- *address_ince: Increment used to ensure that all device IP addresses are unique (see core elements)
 
-
+**services.yml -**
 
 
 
