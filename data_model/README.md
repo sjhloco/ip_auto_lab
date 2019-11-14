@@ -185,4 +185,3 @@ Going to need to have two types of validation
 How to integrate IPAM. DO you use a plugin to pull the elements down for interfaces and IPs, or do you autogenerate and push that config to IPAM?
 
 <br/>Improve naming format for elements within files and those from filter plugins
-
