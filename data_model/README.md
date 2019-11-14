@@ -65,7 +65,24 @@ These core elements are what is required to make this declarative and are used f
 - *fbc_vpc:* VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
 - *address_incre:* Increment used to ensure that all device IP addresses are unique (see core elements)
 
-**services.yml -**
+**services.yml -** All the services that are delivered by the fabric. These are the provision of tenants, vlans, interfaces, external BGP peerings and non-core OSPF domains. All are provided on leaf and border switches expect for BGP and OSPF which are only provisioned on the borders.
+<br/>Each service has the manadatory core elements required to provide the service and the optional advanced elements if customization is required.
+
+- *srv_tenants:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used to create tenants (VRF), L3VNIs, SVIs, L2VNIs and VLANs
+  - *tenant_name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name of the VRF, it will only be created if it is *l3_tenant*
+  - *l3_tenant:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If *yes* it will create a VRF, L3VNI and the associated VLAN and SVI
+      - *vlans:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; List of VLANs within this tenant
+      - *num:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VLAN Name
+      - *name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VLAN number
+      - *ip_addr:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Adding an IP makes it a L3 VLAN and creates the SVI
+      - *ipv4_bgp_redist:* &nbsp;&nbsp;&nbsp;&nbsp; *Yes* will redistribute the SVI into BGP IPv4 address-family
+
+- *srv_tenants_adv.base_vni:* &nbsp;&nbsp;&nbsp;&nbsp; The L3VNIs and L2VNIs are automatically generated from these base values. By default the L3VNI/SVI starts at 3001 and increments by 1 for each L3 tenant, the L2VNI starts at 10000, are created per vlan by adding the vlan number to this value and are increment by 10000 per tenant
+  - *tn_vlan: 3001* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Transit L3VNI start VLAN number. Increments by 1 for each L3 tenant (VRF)
+  - *l3vni: 3001* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Transit L3VNI start VNI number. Increments by 1 for each L3 tenant (VRF)
+  - *l2vni: 10000* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start L2VNI and range to add to each tenant vlan. Increments by 10000 for each tenant
+
+- *srv_tenants_adv.bgp:*&nbsp;&nbsp; Options to change the redistribution route-map name and tag value
 
 
 
