@@ -1,17 +1,62 @@
 ---
 ################ Variables used to create core elements of the device configs ################
 
-# Hostname: What is that added before the node number. Groups are created based on name (i.e spine, broder, leaf)
-device_name:                            # These can be changed to anything as actual name not used in scritping logic
+# The naming structure that is added before the automatically generated node number (0x). Groups are created based on the name (i.e spine, border, leaf)
+device_name:                    # The start (DC1-N9K) can be changed, however the rest must NOT be chaneged as is used in the scritping logic
   spine_name: 'DC1-N9K-SPINE'
   border_name: 'DC1-N9K-BORDER'
   leaf_name: 'DC1-N9K-LEAF'
 
-# Ranges from which addresses are created from. Must have the mask in prefix format (/)
+# Ranges from which device addresses are created from. Must have the mask in prefix format (/)
 addressing:
-  lp_ip_subnet: '192.168.100.0/32'      # By default will use .10 to .37
+  lp_ip_subnet: '192.168.100.0/32'      # Core OSPF and BGP peerings. By default will use .10 to .37
   mgmt_ip_subnet: '10.10.108.0/24'      # Needs to be at least /27 to cover max spine (4), leafs (10) and borders (4)
-  vpc_peer_subnet: '10.255.255.0/28'    # Needs to be at least /28 to cover max leafs (10) and borders (4)
-  srv_ospf_subnet: '10.255.255.16/28'   # Used for OSPF process peerings between border switches (4 addresses per OSPF process)
+  vpc_peer_subnet: '10.255.255.0/28'    # VPC peer link addresses. Needs to be at least /28 to cover max leafs (10) and borders (4)
+  srv_ospf_subnet: '10.255.255.16/28'   # Non-core OSPF process peerings between border switches (4 addresses per OSPF process)
 
-domain: 'stesworld.com'
+bse:
+  users:
+    - username: admin
+      password: $5$zuqcgFp4$62a5Mbxu1uFu7Udszc9boXrR9knz.Rhqbi.xstWTud/
+      role: network-admin
+
+# Details for all the services that the switches consume
+bse_services:
+  domain: 'stesworld.com'
+  src_int: loopback0
+  dns:
+    prim: 10.10.10.41
+    sec: 10.10.10.42
+  tacacs:
+    grp_name: ISE_TACACS
+    key: securekey
+    servers:
+      - 10.10.10.51
+      - 10.10.10.52
+      - 10.10.10.53
+  snmp:
+    host: 10.10.10.43
+    comm: 5NMPC0MMUN1TY
+  ntp:
+    server: [10.10.10.45, 10.10.20.46]
+  log:
+    server: [10.10.10.47, 10.10.20.48]
+
+# Managament and control plane Access-lists
+bse_acl:
+  snmp:
+    name: SNMP_ACCESS
+    source: [10.10.20.43/24, 10.10.10.43/24]
+    port: [udp, 161]
+  ssh:
+    name: SSH_ACCESS
+    source: [10.10.10.0/24, 10.255.254.0/24]
+    port: [tcp, 22]
+
+# Advanced base configuration that is less likely to be changed
+bse_adv:
+  acast_gw_mac: 0000.2222.3333
+  image: nxos.7.0.3.I7.6.bin
+  exec_timeout:
+    console: 0
+    vty: 15

@@ -1,26 +1,25 @@
 ########## lp_address and OSPF process ##########
-
 {#### Create lp_subnet variable if the loopback is not a /32 ####}
 {% if addressing.lp_ip_subnet |ipaddr('netmask') != '255.255.255.255' %}
 {% set lp_subnet = addressing.lp_ip_subnet|ipaddr('prefix') %}
 {% endif %}
 interface loopback 0
   ip address {{ lp_addr }}/{{ lp_subnet |default("32")}}
-{#### Add secondary loopback IP if border or leaf ####}
+{#### Add secondary loopback IP if is a border or leaf ####}
 {% if device_name.spine_name not in inventory_hostname %}
   ip address {{ sec_lp_addr }}/{{ lp_subnet |default("32")}} secondary
 {%endif%}
-
-router ospf {{ ospf_setting.ospf_pro }}
+!
+router ospf {{ fbc.ospf.ospf_pro }}
  router-id {{ lp_addr }}
-
+!
 {#### Create spine interfaces based on number of leaf and border switches ####}
 {% if device_name.spine_name in inventory_hostname %}
 #################### SPINE>>LEAF ####################
 {% for n in range(network_size.num_leafs) %}
 {# Interface number is based on leaf number + spine_to_leaf increment, so 1/1 to leaf1, 1/2 to leaf2, etc #}
-interface {{ base_interface.interface_format }}{{ base_interface.leaf_to_spine+loop.index0 }}
-  description UPLINK > {{ device_name.leaf_name }}{{ "%02d"|format(loop.index) }} {{ base_interface.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+base_interface.leaf_to_spine-1) }}
+interface {{ fbc_adv.base_int.int_format }}{{ fbc_adv.base_int.leaf_to_spine+loop.index0 }}
+  description UPLINK > {{ device_name.leaf_name }}{{ "%02d"|format(loop.index) }} {{ fbc_adv.base_int.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+fbc_adv.base_int.leaf_to_spine-1) }}
   no switchport
   medium p2p
   ip unnumbered loopback0
@@ -32,16 +31,15 @@ interface {{ base_interface.interface_format }}{{ base_interface.leaf_to_spine+l
 #################### SPINE>>BORDER ####################
 {% for n in range(network_size.num_borders) %}
 {# Interface number is based on border number + spine_to_border increment, so 1/11 to border1, 1/12 to border2, etc #}
-interface {{ base_interface.interface_format }}{{ base_interface.spine_to_border+loop.index0 }}
-  description UPLINK > {{ device_name.border_name }}{{ "%02d"|format(loop.index) }} {{ base_interface.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+base_interface.border_to_spine-1) }}
+interface {{ fbc_adv.base_int.int_format }}{{ fbc_adv.base_int.spine_to_border+loop.index0 }}
+  description UPLINK > {{ device_name.border_name }}{{ "%02d"|format(loop.index) }} {{ fbc_adv.base_int.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+fbc_adv.base_int.border_to_spine-1) }}
   no switchport
   medium p2p
   ip unnumbered loopback0
   ip router ospf 1 area 0.0.0.0
   no shutdown
 !
-{% endfor %}
-{% endif %}
+{% endfor %}{% endif %}
 
 {#### Create leaf and border interfaces based on number of spine switches ####}
 {% if device_name.spine_name not in inventory_hostname %}
@@ -49,11 +47,11 @@ interface {{ base_interface.interface_format }}{{ base_interface.spine_to_border
 {% for n in range(network_size.num_spines) %}
 {# To differentiate between border and leaf as have different interface increment variable #}
 {% if device_name.leaf_name in inventory_hostname %}
-interface {{ base_interface.interface_format }}{{ base_interface.leaf_to_spine+loop.index0 }}
-  description UPLINK > {{ device_name.spine_name }}{{ "%02d"|format(loop.index) }} {{ base_interface.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+base_interface.spine_to_leaf-1) }}
+interface {{ fbc_adv.base_int.int_format }}{{ fbc_adv.base_int.leaf_to_spine+loop.index0 }}
+  description UPLINK > {{ device_name.spine_name }}{{ "%02d"|format(loop.index) }} {{ fbc_adv.base_int.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+fbc_adv.base_int.spine_to_leaf-1) }}
 {% elif device_name.border_name in inventory_hostname %}
-interface {{ base_interface.interface_format }}{{ base_interface.border_to_spine+loop.index0 }}
-  description UPLINK > {{ device_name.spine_name }}{{ "%02d"|format(loop.index) }} {{ base_interface.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+base_interface.spine_to_border-1) }}
+interface {{ fbc_adv.base_int.int_format }}{{ fbc_adv.base_int.border_to_spine+loop.index0 }}
+  description UPLINK > {{ device_name.spine_name }}{{ "%02d"|format(loop.index) }} {{ fbc_adv.base_int.int_short }}{{ "%01d" |format(inventory_hostname[-2:] |int+fbc_adv.base_int.spine_to_border-1) }}
 {% endif %}
   no switchport
   medium p2p
@@ -61,8 +59,7 @@ interface {{ base_interface.interface_format }}{{ base_interface.border_to_spine
   ip router ospf 1 area 0.0.0.0
   no shutdown
 !
-{% endfor %}
-{% endif %}
+{% endfor %}{% endif %}
 
 
 {#### Base VXLAN config on leaf and border switchss ####}
@@ -77,7 +74,7 @@ interface nve1
 
 {#### Base BGP config on all switches ####}
 #################### BGP Config ####################
-router bgp {{ bgp_settings.as_num }}
+router bgp {{ fbc.bgp.as_num }}
   router-id {{ lp_addr }}
   address-family l2vpn evpn
 {# This cmd is only needed on leaf & border #}
@@ -93,18 +90,18 @@ router bgp {{ bgp_settings.as_num }}
       send-community
       send-community extended
       soft-reconfiguration inbound
-{# Spines need to be Route Reflectors #}
+{# Spines need to be Route Reflectors (ipv4) #}
 {% if device_name.spine_name in inventory_hostname %}
       route-reflector-client
 {% endif %}
     address-family l2vpn evpn
       send-community
       send-community extended
-{# Spines need to be Route Reflectors #}
+{# Spines need to be Route Reflectors (l2vpn) #}
 {% if device_name.spine_name in inventory_hostname %}
       route-reflector-client
 {% endif %}
-{### Create the spines peers based on members of Ansible leaf and border groups ###}
+{### Create the spines peers based on members of the leaf and border groups ###}
 {% if device_name.spine_name in inventory_hostname %}
 {# loop through the leaf group and get loopback hostvar #}
 {% for x in groups['leaf'] %}
@@ -112,7 +109,7 @@ router bgp {{ bgp_settings.as_num }}
     description {{ x }}
     inherit peer FABRIC_PEERING
 {% endfor %}
-{# loop through the leaf group and get loopback hostvar #}
+{# loop through the border group and get loopback hostvar #}
 {% for x in groups['border'] %}
   neighbor {{ hostvars[x]['lp_addr']}}
     description {{ x }}
@@ -132,17 +129,17 @@ router bgp {{ bgp_settings.as_num }}
 {#### Create VPC config on all border and leaf switches ####}
 {% if device_name.spine_name not in inventory_hostname %}
 #################### VPC Config ####################
-vpc domain {{ vpc.domain }}
+vpc domain {{ fbc_adv.vpc.domain }}
   peer-switch
 {# Config specific for all leaf and border switches with an odd number in hostname #}
 {% if inventory_hostname[-2:]|int is odd %}
   role priority 8192
-{# The keepalive peer is the mgmt IP +1 #}
+{# The keepalive peer is the mgmt IP +1 (is the mgmt IP of odd the even switch) #}
   peer-keepalive destination {{ ansible_host | ipmath(1) }} source {{ ansible_host }} vrf management
 {# Config specific for all leaf and border switches with an odd number in hostname #}
 {% else %}
   role priority 16384
-{# The keepalive peer is the mgmt IP -1 #}
+{# The keepalive peer is the mgmt IP -1 (is the mgmt IP of odd the odd switch) #}
   peer-keepalive destination {{ ansible_host | ipmath(-1) }} source {{ ansible_host }} vrf management
 {%endif%}
   peer-gateway
@@ -150,7 +147,7 @@ vpc domain {{ vpc.domain }}
   auto-recovery
 !
 {# Creates the peer links Portchannel #}
-interface port-channel{{ vpc.peer_po }}
+interface port-channel{{ fbc_adv.vpc.peer_po }}
   description vPC Peerlink
   switchport mode trunk
   switchport trunk allowed vlan all
@@ -158,26 +155,26 @@ interface port-channel{{ vpc.peer_po }}
   spanning-tree port type network
 !
 {# Interface range used for the peer link interfaces can be changed in default variables #}
-interface {{ base_interface.interface_format }}{{ base_interface.vpc_peer }}
+interface {{ fbc_adv.base_int.int_format }}{{ fbc_adv.base_int.vpc_peer }}
   description vPC Peerlink
-  channel-group {{ vpc.peer_po }} mode active
+  channel-group {{ fbc_adv.vpc.peer_po }} mode active
   no shut
 !
 {# VLAN used for the VPC peer link OSPF peering #}
-vlan {{ vpc.peer_vlan }}
+vlan {{ fbc_adv.vpc.peer_vlan }}
   name special_svi_over_peer-link
 !
-interface Vlan {{ vpc.peer_vlan }}
+interface Vlan {{ fbc_adv.vpc.peer_vlan }}
   description special_svi_over_peer-link
   no shutdown
   medium p2p
   no ip redirects
 {# For border devices using peer_incre creates /31 peer-link IPs based in hostname number #}
 {% if device_name.border_name in inventory_hostname %}
-  ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+vpc.peer_incre.border) }}/31
+  ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+address_incre.vpc_border_ip) }}/31
 {# For leaf devices using peer_incre creates /31 peer-link IPs based in hostname number #}
 {% elif device_name.leaf_name in inventory_hostname %}
-  ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+vpc.peer_incre.leaf) }}/31
+  ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+address_incre.vpc_leaf_ip) }}/31
 {%endif%}
   no ipv6 redirects
   ip router ospf 1 area 0.0.0.0

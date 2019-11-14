@@ -1,50 +1,48 @@
 ---
 ################ Variables used to decide how the fabric will look ################
 # This Only scales to 4 spines, 10 leafs, 4 borders. By default the following ports are used:
-# SPINE-to-LEAF = Eth1/1 - 1/10     SPINE-to-Border = Eth1/11 - 1/15
-# LEAF-to-SPINE = Eth1/1 - 1/5      BORDER-to-SPINE: = Eth1/1 - 1/5
-# VPC Peer-link = Eth1/127 - 128    VPC keepalive = mgmt
+# SPINE-to-LEAF = Eth1/1 - 1/10           SPINE-to-Border = Eth1/11 - 1/15
+# LEAF-to-SPINE = Eth1/1 - 1/5            BORDER-to-SPINE: = Eth1/1 - 1/5
+# VPC Peer-link = Eth1/127 - 128          VPC keepalive = mgmt
 
 # How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in VPC pair
 network_size:
-  num_spines: 0
-  num_borders: 4
+  num_spines: 2
+  num_borders: 2
   num_leafs: 2
 
 # To change Fabric routing protocol settings
-ospf_setting:
-  ospf_pro: 1
-  ospf_area: 0.0.0.0
-
-bgp_settings:
-  as_num: 65001
-
+fbc:
+  ospf:
+    ospf_pro: 1
+    ospf_area: 0.0.0.0
+  bgp:
+    as_num: 65001
 
 ################ Advanced settings to further customize the fabric ################
 
-# To change the interfaces used to create the farbic. These are the first interfaces used, the playbook increments these
-base_interface:
-  interface_format: Ethernet1/            # Switch interface, must be same on all switches
-  int_short: Eth1/                        # Switch interface used in interface descriptions
-  spine_to_leaf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
-  spine_to_border: 11                     # First interface used for SPINE to BORDER links (1 to 4)
-  leaf_to_spine: 1                        # First interface used LEAF to SPINE links (1 to 4)
-  border_to_spine: 1                      # First interface used BORDER to SPINE links (1 to 4)
-  vpc_peer: 127-128                       # Interfaces used for the VPC peer Link
+fbc_adv:
+  # To change the interfaces used to create the farbic. These are the first interfaces used, the playbook increments these
+  base_int:
+    int_format: Ethernet1/            # Switch interface, must be same on all switches
+    int_short: Eth1/                        # Switch interface used in interface descriptions
+    spine_to_leaf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
+    spine_to_border: 11                     # First interface used for SPINE to BORDER links (1 to 4)
+    leaf_to_spine: 1                        # First interface used LEAF to SPINE links (1 to 4)
+    border_to_spine: 1                      # First interface used BORDER to SPINE links (1 to 4)
+    vpc_peer: 127-128                       # Interfaces used for the VPC peer Link
+  # All VPC specific settings except for peer Link interfaces (fabric.yml - base_interface) and subnet (base.yml - addressing)
+  vpc:
+    domain: 1                             # VPC Domain number
+    peer_po: 1                            # Port-channel used for Peer Link
+    peer_vlan: 2                          # VLAN used for Peer Link and OSPF peering
 
-# Increment that is added to the device hostname number to generate unique last octet of the LP and MGMT IP addresses
+# The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses
 address_incre:
   spine_ip: 10                            # SPINE IP addresses will be from .11 to .14
   border_ip: 15                           # BORDER IP addresses will be from .16 to .19
   leaf_ip: 20                             # LEAF IP addresses will be from .21 to .30
   sec_leaf_lp: 30                         # Pair of LEAF secondary loopback IP addresses will be from .31 to .35
   sec_border_lp: 35                       # Pair of BORDER secondary loopback addresses will be from .36 to .37
-
-# All VPC specific settings except for peer Link interfaces (fabric.yml - base_interface) and subnet (base.yml - addressing)
-vpc:
-  domain: 1                             # VPC Domain number
-  peer_po: 1                            # Port-channel used for Peer Link
-  peer_vlan: 2                          # VLAN used for Peer Link and OSPF peering
-  peer_incre:                           # Increments to stop conflict between BORDER and LEAF assignment
-    leaf: 0                             # Start IP for LEAF Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
-    border: 10                          # Start IP for BORDER Peer Links, so BORDER1 is .11, BORDER2 .12, etc
+  vpc_leaf_ip: 0                          # Start IP for LEAF Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
+  vpc_border_ip: 10                       # Start IP for BORDER Peer Links, so BORDER1 is .11, BORDER2 .12, etc

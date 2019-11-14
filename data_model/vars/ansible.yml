@@ -1,19 +1,19 @@
 ---
 ################ Login and Ansible settings (normally would be in all.yml) ################
 
-# Python loaction on Ansible host (Operating system specific)
+# Python location on the Ansible host (operating system specific)
 ansible_python_interpreter: "/usr/bin/env python"           # Ubuntu
 
-# File Location
+# Base directory Location to store the generated configuration snippets
 dir_path: ~/device_configs
 
 # Connection Variables
-creds_all:                          # Napalm
+creds_all:                            # Napalm
   hostname: "{{ ansible_host|default(inventory_hostname) }}"
   username: admin
   password: ansible
 
-# Operating system used by NAPALM or network modules
+# Operating system type
 device_type:
   spine_os: nxos
   border_os: nxos

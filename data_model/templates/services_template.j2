@@ -24,6 +24,7 @@ vlan {{ tn.tn_vlan }}
 {% endif %}{% endfor %}
 !
 {# Create all the tenants (VRFs) on leaf and border #}
+spanning-tree vlan 1-3967 priority 4096
 #################### VRF & SVIs ####################
 {% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
 vrf context {{ tn.tenant_name }}
@@ -33,6 +34,9 @@ vrf context {{ tn.tenant_name }}
     route-target both auto
     route-target both auto evpn
 {% endif %}{% endfor %}
+!
+hardware access-list tcam region racl 512
+hardware access-list tcam region arp-ether 256 double-wide
 !
 {% for tn in srv_tenants_dm %}{% for vl in tn.vlans %}
 {# Create all the SVIs (for L2VNIs) on the leaf switches #}
@@ -88,7 +92,7 @@ interface nve1
 {% for tn in srv_tenants_dm %}
 {# Only create the route-map on the leaf switches if any of the tenant SVIs have been redistibuted #}
 {% if device_name.leaf_name in inventory_hostname and tn.redist is defined %}
-route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",bgp_settings.as_num) }} permit 10
+route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",fbc.bgp.as_num) }} permit 10
   match tag {{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni)}}
 {% endif %}
 {% endfor %}
@@ -100,7 +104,7 @@ router bgp 65001
       advertise l2vpn evpn
 {# Only associate the route-map on the leaf switchesif any of the tenant SVIs have been redistibuted #}
 {% if device_name.leaf_name in inventory_hostname and tn.redist is defined %}
-      redistribute direct route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",bgp_settings.as_num) }}
+      redistribute direct route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",fbc.bgp.as_num) }}
 {% endif %}
 {% endif %}{% endfor %}
 
@@ -289,7 +293,7 @@ ip prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) 
 {# created based on the vrf names of OSPF process and tennat beign the same #}
 {% if tn.tenant_name == vrf.tenant %}
 {% set ext_comm = srv_routing_adv.ospf.cl_in_naming | replace("vrf",vrf.tenant) %}
-ip extcommunity-list standard {{ ext_comm }} permit rt {{ bgp_settings.as_num }}:{{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni) }}
+ip extcommunity-list standard {{ ext_comm }} permit rt {{ fbc.bgp.as_num }}:{{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni) }}
 {% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}{% endfor %}
 !
 {### Create all the Route-maps ###}
@@ -320,15 +324,15 @@ route-map {{ srv_routing_adv.bgp.rm_out_naming | replace("name",peer.name) }} pe
 {# Create the OSPF Route-maps #}
 {% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
 {% if ospf.bgp_redist_in == true %}
-route-map {{ srv_routing_adv.ospf.rm_in_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }} permit 10
+route-map {{ srv_routing_adv.ospf.rm_in_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
  match extcommunity {{ srv_routing_adv.ospf.cl_in_naming | replace("vrf",vrf.tenant) }}
 {% endif %}
 {% if ospf.bgp_redist_out |length == 1 %}
-route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }} permit 10
+route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
  match ip address prefix-list {{ ospf.bgp_redist_out[0] }}
 {% elif ospf.bgp_redist_out |length > 1 %}
-route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }} permit 10
- match ip address prefix-list {{ srv_routing_adv.ospf.pl_out_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }}
+route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
+ match ip address prefix-list {{ srv_routing_adv.ospf.pl_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
 {% endif %}{% endfor %}{% endif %}{% endfor %}
 !
 ##################### OSPF Process config #####################
@@ -371,14 +375,14 @@ router ospf {{ ospf.pro }}
     router-id {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+ip_incr.val) }}
 {% set ip_incr.val = ip_incr.val + 4 %}
 {% if ospf.bgp_redist_in == true %}
-    redistribute bgp {{ bgp_settings.as_num }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }}
+    redistribute bgp {{ fbc.bgp.as_num }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
 {% endif %}
     passive-interface default
 {% endfor %}{% endif %}{% endfor %}
 !
 {### Create the BGP configurations ###}
 ##################### BGP Configuration #####################
-router {{ bgp_settings.as_num }}
+router {{ fbc.bgp.as_num }}
 {# Create BGP templates and vrf addr family #}
   template peer INET_PEERING
     timers 10 30
@@ -405,7 +409,7 @@ router {{ bgp_settings.as_num }}
     address-family ipv4 unicast
 {% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
 {% if ospf.bgp_redist_out |length > 0 %}
-      redistribute ospf {{ ospf.pro }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",bgp_settings.as_num) }}
+      redistribute ospf {{ ospf.pro }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
 {% endif %}{% endfor %}{% endif %}
       maximum-paths 2
 {% if vrf.bgp.ebgp_peerings != none %}{% for peer in vrf.bgp.ebgp_peerings %}

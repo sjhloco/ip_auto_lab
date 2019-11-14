@@ -18,7 +18,21 @@
     check_mode: False
     tags: dir
 
-# 2. Create the fabric config snippets using fabric_template.j2
+# 2. Create the base config snippets using basetemplate.j2
+- name: "SYS >> Create base config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+  tasks:
+  - name: "SYS >> Create config snippets"
+    template:
+      src: base_template.j2
+      dest: "{{ dir_path }}/{{ inventory_hostname }}/base.cfg"
+    tags: base
+
+# 3. Create the fabric config snippets using fabric_template.j2
 - name: "SYS >> Create fabric config snippets"
   hosts: all
   connection: local
@@ -31,15 +45,13 @@
     template:
       src: fabric_template.j2
       dest: "{{ dir_path }}/{{ inventory_hostname }}/fabric.cfg"
-  # - debug:
-  #     var: vpc.peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+vpc.peer_incre.border)
     tags: fabric
 
-# 2. Create the fabric config snippets using fabric_template.j2
+# 4. Create the service config snippets using service_template.j2
 - name: "SYS >> Create services config snippets"
   hosts: all
   connection: local
-  vars_files:               # !!! WHY DOES IT FAIL IF I DONT HAVE ALL VAR FILES IN HERE, should only need services !!!
+  vars_files:
     - vars/ansible.yml
     - vars/base.yml
     - vars/fabric.yml
@@ -58,5 +70,6 @@
         dest: "{{ dir_path }}/{{ inventory_hostname }}/services.cfg"
       changed_when: false
     # - debug:
-    #     var: srv_tenants_dm
+    #     var: hostvars
     tags: services
+
