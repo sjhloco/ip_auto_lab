@@ -27,9 +27,9 @@ These core elements are the minimun requirements to create the declarative fabri
 *addressing:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
 
 - *lp_ip_subnet: 'x.x.x.x/32'*        Core OSPF and BGP peerings. By default will use .10 to .37
-- *mgmt_ip_subnet: 'x.x.x.x/27'*      Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4) switches
-- *vpc_peer_subnet: 'x.x.x.x/28'*     VPC peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4) switches
-- *srv_ospf_subnet: 'x.x.x.x/28'*     Non-core OSPF process peerings between the border switches (4 IPs per-OSPF process)
+- *mgmt_ip_subnet: 'x.x.x.x/27'*      Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)
+- *vpc_peer_subnet: 'x.x.x.x/28'*     VPC peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)
+- *srv_ospf_subnet: 'x.x.x.x/28'*     Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)
 
 **fabric.yml**«
 *network_size:* How big the network is, so the number of each switch type. The border and leaf switches must be in increments of 2 as are in a VPC pair.
@@ -44,27 +44,27 @@ These core elements are the minimun requirements to create the declarative fabri
 - *border_ip: 15*                     Border IP addresses will be from .16 to .19
 - *leaf_ip: 20*                       Leaf IP addresses will be from .21 to .30
 - *sec_leaf_lp: 30*                   A pair of Leaf secondary loopback IP addresses will be from .31 to .35
-- *sec_border_lp: 35*                 A pair of Border secondary loopback addresses will be from .36 to .37
+- *sec_border_lp: 35*                 A pair of B secondary loopback addresses will be from .36 to .37
 - *vpc_leaf_ip: 0*                    Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 is .2, Leaf3 is .3, etc
 - *vpc_border_ip: 10*                 Start IP for Border Peer Links, so Border1 is .11, Border2 is .12, etc
 
 ## Dynamic Inventory
 
-Have a dynamic inventory script and as well as an inventory plugin which both do the same thing. Dynamic inventory is better for trying things out to get the code correct as not constrained by Ansible in testing and printouts. The inventory plugin is easier when building the actaul inventory as it is already structured using Ansible class and methods. Inventory plugins is the recomended way but kept both as dynamic inventory is good for troublehsooting and trying out new elements in the invtory.
+The inventory script the inventory plugin both achieve the same thing, to create a dynamic inventory from the core data model elements. The inventory script is better for trying things out to get the correct structure (list and dictionaries) for the input as you are not constrained by Ansible in testing and printouts. The inventory plugin is easier when building the actual inventory as it is already structured using pre=built Ansible classes and methods. Inventory plugins is the recommended way but I kept both as the inventory is good for troubleshooting when trying to add new variables to the inventory.
 
-The only things required to build the invnetorires are the core data model elements.
+The only things required to build the inventories are the core data model elements.
 
-The dynamic script can be run using these cmds:
-**./dyn_inv_script.py --help** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *See all the argunments possible*
-**./dyn_inv_script.py --list** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *Print to screen all groups, members and vars*
-**./dyn_inv_script.py --host DC1-N9K-BORDER02**&nbsp;&nbsp;&nbsp;&nbsp; *Print to screen all host_vars for a specific host*
-**ansible-playbook playbook.yml -i dyn_inv_script.py** &nbsp;&nbsp;&nbsp; *Run the playbook using the dynamic inventory*
+The inventory script can be run using these cmds:\
+**./dyn_inv_script.py --help**                                       *See all the argunments possible*\
+**./dyn_inv_script.py --list**                                       *Print to screen all groups, members and vars*\
+**./dyn_inv_script.py --host DC1-N9K-BORDER02**                      *Print to screen all host_vars for a specific host*\
+**ansible-playbook playbook.yml -i dyn_inv_script.py**               *Run the playbook using the dynamic inventory*
 
-The inventory pluggin can be run using these cmds. When not running against a playbook have to use this *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)*, guess can set as env var or set in config file.
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph** &nbsp;&nbsp; *Just outputs all groups*
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list** &nbsp;&nbsp; *All host_vars, groups and members*
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**
-**ansible-playbook playbook.yml -i inv_from_vars_cfg.yml** &nbsp;&nbsp;&nbsp;&nbsp; *To run against a playbook*
+When not running the inventory pluggin against a playbook you have to use this *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* (could probably set as env var or in config file).
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**   *Just outputs all groups*\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**    *All host_vars, groups and members*\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**\
+**ansible-playbook playbook.yml -i inv_from_vars_cfg.yml**                                                  *To run against a playbook*
 
 ## Data Models
 
