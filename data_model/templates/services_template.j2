@@ -257,9 +257,9 @@ ip prefix-list DENY-ALL seq 5 permit 0.0.0.0/0 le 32
 !
 {# Create the eBGP peerings prefix-lists #}
 {% for vrf in srv_routing %}
-{# Stops it failing if ebgp_peerings not defined in all VRFs #}
-{% if vrf.bgp.ebgp_peerings != none %}
-{% for peer in vrf.bgp.ebgp_peerings %}
+{# Stops it failing if bgp_peerings not defined in all VRFs #}
+{% if vrf.bgp.bgp_peerings != none %}
+{% for peer in vrf.bgp.bgp_peerings %}
 {# The start sequence number that has 5 added to it with each loop iteration #}
 {% set seq = namespace(pfx=5) %}
 {% if peer.allowed_in |length  > 1 %}
@@ -274,7 +274,7 @@ ip prefix-list {{ srv_routing_adv.bgp.pl_in_naming | replace("name",peer.name) }
 ip prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }} seq {{ seq.pfx }} permit {{ pfx }}
 {% set seq.pfx = seq.pfx + 5 %}
 {% endfor %}{% endif %}{% endfor %}{% endif %}
-{# Stops it failing if ebgp_peerings not defined in all VRFs #}
+{# Stops it failing if bgp_peerings not defined in all VRFs #}
 {% if vrf.bgp.inet_peerings != none %}
 {# Create the INET peerings prefix-lists #}
 {% for peer in vrf.bgp.inet_peerings %}
@@ -298,7 +298,7 @@ ip extcommunity-list standard {{ ext_comm }} permit rt {{ fbc.bgp.as_num }}:{{ s
 !
 {### Create all the Route-maps ###}
 {# Create the eBGP peerings Route-maps #}
-{% for vrf in srv_routing %}{% if vrf.bgp.ebgp_peerings != none %}{% for peer in vrf.bgp.ebgp_peerings %}
+{% for vrf in srv_routing %}{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
 route-map {{ srv_routing_adv.bgp.rm_in_naming | replace("name",peer.name) }} permit 10
 {% if peer.allowed_in |length  == 1 %}
  match ip address prefix-list {{ peer.allowed_in[0] }}
@@ -391,7 +391,7 @@ router {{ fbc.bgp.as_num }}
       send-community extended
       route-map rm_INET_IN in
       soft-reconfiguration inbound
-{% for vrf in srv_routing %}{% if vrf.bgp.ebgp_peerings != none %}{% for peer in vrf.bgp.ebgp_peerings %}
+{% for vrf in srv_routing %}{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
   template {{ peer.name }}_PEERING
     remote-as {{ peer.remote_as }}
     timers {{ peer.timers |default("3 9") }}
@@ -412,7 +412,7 @@ router {{ fbc.bgp.as_num }}
       redistribute ospf {{ ospf.pro }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
 {% endif %}{% endfor %}{% endif %}
       maximum-paths 2
-{% if vrf.bgp.ebgp_peerings != none %}{% for peer in vrf.bgp.ebgp_peerings %}
+{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
     neighbor {{ peer.peer_ip }}
       inherit peer {{ peer.name }}_PEERING
       description {{ peer.description }}

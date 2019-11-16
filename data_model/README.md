@@ -55,27 +55,27 @@ The inventory script the inventory plugin both achieve the same thing, to create
 The only things required to build the inventories are the core data model elements.
 
 The inventory script can be run using these cmds:\
-**./dyn_inv_script.py --help**                                       *See all the argunments possible*\
-**./dyn_inv_script.py --list**                                       *Print to screen all groups, members and vars*\
+**./dyn_inv_script.py --help**&emsp; &emsp; &emsp;                                       *See all the argunments possible*\
+**./dyn_inv_script.py --list**&emsp; &emsp; &emsp;                                       *Print to screen all groups, members and vars*\
 **./dyn_inv_script.py --host DC1-N9K-BORDER02**                      *Print to screen all host_vars for a specific host*\
 **ansible-playbook playbook.yml -i dyn_inv_script.py**               *Run the playbook using the dynamic inventory*
 
-When not running the inventory pluggin against a playbook you have to use this *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* (could probably set as env var or in config file).
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**   *Just outputs all groups*\
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**    *All host_vars, groups and members*\
+When not running the inventory pluggin against a playbook you have to use this *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* (could probably set as env var or in config file).\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**   *groups*\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**    *All*\
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**\
 **ansible-playbook playbook.yml -i inv_from_vars_cfg.yml**                                                  *To run against a playbook*
 
 ## Data Models
 
-**ansible.yml -** Contains the login and Ansible settings that would normally be stored in *all.yml*. The reason I dont use  *group_vars* is that the inventory plugin would add each variable in *all.yml* to every devices *host_var*.
+**ansible.yml -** Contains the login and Ansible settings that would normally be stored in *all.yml*. The reason I dont use  *group_vars* is that the inventory plugin would add each variable in *all.yml* to each devices *host_var* rather than the *group_var*.
 
 - *ansible_python_interpreter:* Python location on the Ansible host (operating system specific)
-- *dir_path:* Base directory Location to store the generated configuration snippets
+- *dir_path:* Base directory location to store the generated configuration snippets
 - *creds_all:* User credentials for connecting to devices
-- *device_type:* Operating system of each device type (Spine, Leaf and Border)
+- *device_type:* Operating system of each device type (spine, leaf and border)
 
-**base.yml -** These varaibles are used for creating the devices base configuration, so contains things such as naming, IP addressing, users, syslog, aaa, ACLs, etc. The naming format and addressing subnets are used by the inventory and all other templates as are part of the 5 core elements needed to make this declaritive.
+**base.yml -** These variables are used for creating the devices base configuration, so contains things such as naming, IP addressing, users, syslog, aaa, ACLs, etc. The naming format and addressing subnets are used by the inventory and all other templates as are part of the five core elements.
 
 - *device_name:* Naming format for hostname (see core elements)
 - *addressing:* Subnets from which device addressing is generated (see core elements)
@@ -84,100 +84,113 @@ When not running the inventory pluggin against a playbook you have to use this *
 - *bse_acl:* Management ACLs for things such as snmp and ssh access
 - *base_adv:* Configuration elements less likely to change such as the image and exec-timeout
 
-**fabric.yml -** The variables that decide the size of the network and how the physical fabric topology will look. Although the majority of these options can be left the same the data models are included to provide additonal nerd knobs to further customize the setup if required.
+**fabric.yml -** The variables that decide the size of the network and how the physical fabric topology will look. Although the majority of these options can be left the same the extra data models are included to provide additonal nerd knobs to further customize the setup if required.
 
-- *network_size:*  How big the network is, the number of switches per network role (see core elements)
+- *network_size:*  How big the network is. The number of switches per network role (see core elements)
 - *fbc:* The core routing options such as OSPF process, area and BGP AS number
-- *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for the different device inter-connects (e.g. spine to leafs)
+- *fbc_adv.base_int:* Provides the ability to change the name and ranges of interfaces used for device inter-connects
 - *fbc_vpc:* VPC settings for leaf and border switches such as the domain and peer link details. The keepalive will always use the mgmt interface and cant be changed using the data model
 - *address_incre:* Increment used to ensure that all device IP addresses are unique (see core elements)
 
 ## Service Data Model
 
-**services.yml -** All the services that are delivered by the fabric. These are the provision of tenants, vlans, interfaces, external BGP peerings and non-core OSPF domains. All are provided on leaf and border switches expect for BGP and OSPF which are only provisioned on the borders.
-<br/><br/>Each service has the manadatory core elements required to provide the service and the optional advanced elements if customization is required.
+**services.yml -** The services that are delivered by the fabric. All are provided on leaf and border switches expect for BGP and OSPF which are only provisioned on the borders.\\
+Each service has the mandatory core elements required to provide the service and the optional advanced elements if customization is required.
 
 ### Tenants & VLANs
 
-- *srv_tenants:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used to create tenants (VRF), L3VNIs, SVIs, L2VNIs and VLANs
-  - *tenant_name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name of the VRF, it will only be created if it is *l3_tenant*
-  - *l3_tenant:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If *yes* it will create a VRF, L3VNI and the associated VLAN and SVI
-      - *vlans:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; List of VLANs within this tenant
-      - *num:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VLAN Name
-      - *name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VLAN number
-      - *ip_addr:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Adding an IP makes it a L3 VLAN and creates the SVI
-      - *ipv4_bgp_redist:* &nbsp;&nbsp;&nbsp;&nbsp; *Yes* will redistribute the SVI into BGP IPv4 address-family
+Used to create tenants (VRF), L3VNIs, SVIs, L2VNIs and VLANs. If it is a L3 tenant a VRF is created on leaf and borders but the SVI and VLANs created only on the leafs. If it is not a L3 tenant no VRF is created and the VLANs are created on the leaf and borders as the default gateway will be on an external router or firewall attached to the borders.
 
-- *srv_tenants_adv.base_vni:* &nbsp;&nbsp;&nbsp;&nbsp; The L3VNIs and L2VNIs are automatically generated from these base values. By default the L3VNI/SVI starts at 3001 and increments by 1 for each L3 tenant, the L2VNI starts at 10000, are created per vlan by adding the vlan number to this value and are increment by 10000 per tenant
-  - *tn_vlan: 3001* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Transit L3VNI start VLAN number. Increments by 1 for each L3 tenant (VRF)
-  - *l3vni: 3001* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Transit L3VNI start VNI number. Increments by 1 for each L3 tenant (VRF)
-  - *l2vni: 10000* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start L2VNI and range to add to each tenant vlan. Increments by 10000 for each tenant
+- *srv_tenants:*
+  - *tenant_name:*              Name of the VRF, only be created if it is *l3_tenant*
+  - *l3_tenant:*                If *yes* it will create a VRF, L3VNI and the associated VLAN and SVI
+      - *vlans:*                List of VLANs within this tenant
+      - *num:*                  VLAN name
+      - *name:*                 VLAN number
+      - *ip_addr:*              Adding an IP makes it a L3 VLAN and creates the SVI
+      - *ipv4_bgp_redist:*      *Yes* will redistribute the SVI into the BGP IPv4 address-family
 
-- *srv_tenants_adv.bgp:*&nbsp;&nbsp; Options to change the redistribution route-map name and tag value
+The L3VNIs and L2VNIs are automatically generated from the base VNI values. By default the L3VNIs/SVIs start at 3001 and are incremented by 1 for each L3 tenant. The L2VNIs start at 10000, are created per vlan by adding the vlan number to this value and are incremented by 10000 per tenant.
+
+- *srv_tenants_adv.base_vni:*
+  - *tn_vlan: 3001*      Transit L3VNI start VLAN number. Increments by 1 for each L3 tenant (VRF)
+  - *l3vni: 3001*        Transit L3VNI start VNI number. Increments by 1 for each L3 tenant (VRF)
+  - *l2vni: 10000*       Start L2VNI and range to add to each tenant vlan. Increments by 10000 for each tenant
+
+- *srv_tenants_adv.bgp:* Options to change the redistribution route-map name and tag value
 
 ### Interfaces
 
-- *srv_ports:* &nbsp;&nbsp;&nbsp;&nbsp; Used to create the single and dual homed interfaces. Any interface can be delegated as a trunk, access or Layer 3 port. *single-homed* and *dual-homed* are dictionary keys with the values being lists of interfaces. OSPF can only be enabled on a Border switch Layer 3 interface
-  - *single_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For devices only attached to one switch
-    - *description:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Interface description
-    - *port_type:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can be *access*, *trunk* or *layer3*
-    - *port_variable:* &nbsp;&nbsp;&nbsp;&nbsp; If *access* is the vlan, if *trunk* the allowed vlans (seperated by ,) and if *layer3* the IP address
-    - *ospf:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Optionally enable OSPF. Specify the process and hello, area is automatically worked out
-    - *switch:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name of the switch to which the port is added
-  - *dual_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For devices attached in a port-channel to two switches
-    - *po_mode:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Same settings as single-homed, but must
-    - *switch:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Only specify the odd numbered switch and it is automatically created on the VPC pair.
+Used to create the single and dual homed interfaces. Any interface can be delegated as a *trunk*, *access* or *layer3* port with each having its own *port_variable*. *single-homed* and *dual-homed* are dictionary keys with the values being lists of interfaces and their parameters. The port-channel mode is only available on dual-homed interfaces and OSPF can only be enabled on a border switch layer3 interface.
 
-- *srv_ports_adv:* &nbsp;&nbsp;&nbsp;&nbsp; Modify the reserved interface, port-channel and vpc ranges that server ports can be automatically assigned from. This applies to all leaf and border switches
-  - *dual_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used only for dual-homed devices
-    - *first_int: Ethernet1/21* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; First interface
-    - *last_int: Ethernet1/50* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Last interface
-    - *po: 21* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  First PortChannel used
-    - *vpc: 21* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  First VPC used
-  - *single_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used only for single-homed devices
-    - *first_int: Ethernet1/51* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; First interface
-    - *last_int: Ethernet1/60* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Last interface
+- *srv_ports:*
+  - *single_homed:*          For devices only attached to one switch
+    - *description:*         Interface description
+    - *port_type:*           Can be *access*, *trunk* or *layer3*
+    - *port_variable:*       If *access* is the vlan, if *trunk* the allowed vlans (seperated by ,) and if *layer3* the IP address
+    - *ospf:*                Optionally enable OSPF. Specify process and hello, area is automatically worked out
+    - *switch:*              Name of the switch to which the port is added
+  - *dual_homed:*            For devices attached in a port-channel to two switches
+    - *description:*
+    - *port_type:*
+    - *port_variable:*
+    - *ospf:*
+    - *po_mode:*             Whether is static, LACP, PAGP and the mode
+    - *switch:*              Only specify the odd numbered switch, it will automatically be created on the VPC pair
+
+Modify which interfaces are reserved for single and dual-homed port assignment as well the port-channel and vpc ranges used. This applies to all leaf and border switches
+
+- *srv_ports_adv:*
+  - *dual_homed:*                    Used only for dual-homed devices
+    - *first_int: Ethernet1/21*      First interface
+    - *last_int: Ethernet1/50*       Last interface
+    - *po: 21*                       First PortChannel used
+    - *vpc: 21*                      First VPC used
+  - *single_homed:*                  Used only for single-homed devices
+    - *first_int: Ethernet1/51*      First interface
+    - *last_int: Ethernet1/60*       Last interface
 
 ### Routing Protocols
 
-- *srv_routing:* &nbsp;&nbsp;&nbsp;&nbsp; Used to create BGP peerings or non-backbone OSPF process only on the border switches. For redistribution and filtering (*allowed_in* and *allowed_out*) can list the required networks or use the pre-built prefix-lists of ALLOW-ALL, DENY-ALL and DEFAULT.
-  - *tenant:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp The VRF that all the routing protocols are in
+Used to create BGP peerings or non-backbone OSPF process only on the border switches. For redistribution and filtering (*allowed_in* and *allowed_out*) can list the required networks or use the pre-built prefix-lists of ALLOW-ALL, DENY-ALL and DEFAULT.
+
+- *srv_routing:*
+  - *tenant:*                           The VRF that all the routing protocols are within
     - *bgp:*
-      - *inet_peerings:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ISP peerings which only accept a default-route in
-        - *name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Short name used in route-maps
+      - *inet_peerings:*                ISP peerings which only accept a default-route in
+        - *name:*                       Short name used in route-map prefix-list names
         - *remote_as:*
         - *peer_ip:*
         - *description:*
-        - *allowed_out:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The network/prefix (seperated by ,) advertised. Blank will allow all
-        - *timers: [3, 9]* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Uses the default of 3 and 9 unless unhased and specified
-      - *ebgp_peerings:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; eBGP peerings which can advertise and receive anything
+        - *allowed_out:*                Specify the networks or use ALLOW-ANY, DENY-ANY or DEFAULT
+        - *timers: [3, 9]*              Uses the default of 3 and 9 unless unhased and specified
+      - *bgp_peerings:*                 BGP peerings which can advertise and receive anything
         - *name:*
         - *remote_as:*
         - *peer_ip:*
         - *description:*
-        - *allowed_in: [ALLOW-ANY]* &nbsp;&nbsp;&nbsp; Specify the network/prefixes or use ALLOW-ANY, DENY-ANY or DEFAULT
+        - *allowed_in: [ALLOW-ANY]*
         - *allowed_out: [DENY-ALL]*
         - *timers: [3, 9]
-    - *ospf:* &nbsp;&nbsp;&nbsp;&nbsp; Only creates the OSPF process, interfaces are added using the 'Device ports' service
-      - *pro:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The same process number is used on all border switches
-      - *area: 0.0.0.1*  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; First area, so BORDER1/2 will be 0.0.0.1 and BORDER3/4 0.0.0.2
-      - *inter_sw_vlan:*  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VLAN used for OSPF peering between border leafs (IP is got from base.yml)
-      - *default_orig: no* &nbsp;&nbsp;&nbsp;&nbsp; Use 'yes' to advertise default route or 'always' to advertise it even if it doesnt exist
-      - *bgp_redist_in: yes* &nbsp;&nbsp;&nbsp;&nbsp; Redistributes based on the tenant RT, these are the SVIs redist into BGP with a tag
-      - *bgp_redist_out: [ALLOW-ANY]* &nbsp;&nbsp;&nbsp;&nbsp; The network/prefix (seperated by ,) redist into this tenant (into BGP).
+    - *ospf:*                          Only creates the process, interfaces are added using *srv_ports*
+      - *pro:*                         The same process number is used on all borders
+      - *area: 0.0.0.1*                First area, BORDER1/2 would be 0.0.0.1 and BORDER3/4 0.0.0.2
+      - *inter_sw_vlan:*               VLAN used for OSPF peering between border leafs (IP got from *base.yml*)
+      - *default_orig: no*             Use *'yes'* or *'always'* to advertise a default route
+      - *bgp_redist_in: yes*           Redistributes based on the tenant RT (are the SVIs redist into BGP with a tag)
+      - *bgp_redist_out: [ALLOW-ANY]*  The network/prefix (seperated by ,) redist into this tenant (into BGP)
 
-- *srv_routing_adv.bgp:* &nbsp;&nbsp;&nbsp;&nbsp; Use to change the naming format for the BGP route-maps and prefix-lists
-- **dir**
-srv_routing_adv.ospf:* &nbsp;&nbsp;&nbsp;&nbsp; Use to change the naming format for the BGP route-maps, prefix-list and community list
+- *srv_routing_adv.bgp:* Use to change the naming format for the BGP route-maps and prefix-lists
+- srv_routing_adv.ospf:* Use to change the naming format for the BGP route-maps, prefix-list and community list
 
-## Notes/ Caveats/ Improvemnents/ Validation
+## Rendering the Templates
 
-Simple playbook runs the different plays to create the sperate config snippets and stores in a floder specifically for that device. The default location for this is *~/device_configs* but can be changed in ansible.yml. Specific plays can be run individually using the following tags.
+Simple playbook runs the different plays to create the seperate configuration snippets and store them in a folder specifically for that device. The default location for this is *~/device_configs* but can be changed in *ansible.yml*. Specific plays can be run individually using the following tags:
 
-- **dir** &nbsp;&nbsp; Deletes the base directory (*device_configs*) and recreates it
-- **base** &nbsp;&nbsp; Renders *base_template.j2* with *base.yml* and stores the generated output in *base.cfg*
-- **fabric** &nbsp;&nbsp; Renders *fabric_template.j2* with *fabric.yml* and stores the generated output in *fabric.cfg*
-- **services** &nbsp;&nbsp; Renders *services_template.j2* with *services.yml* and stores the generated output in *services.cfg*
+- **dir**         Deletes the base directory (*device_configs*) and recreates it
+- **base**        Renders *base_template.j2* with *base.yml* and stores the generated output in *base.cfg*
+- **fabric**      Renders *fabric_template.j2* with *fabric.yml* and stores the generated output in *fabric.cfg*
+- **services**    Renders *services_template.j2* with *services.yml* and stores the generated output in *services.cfg*
 
 ## Notes/ Caveats/ Improvemnents/ Validation
 

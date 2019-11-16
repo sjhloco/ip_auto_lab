@@ -134,7 +134,7 @@ srv_routing:
           description: GTT Internet Peering
           allowed_out: [201.76.1.144/28]   # The network/prefix (seperated by ,) advertised. Blank will allow all
           #timers: [3, 9]                                 # Uses the default of 3 and 9 unless unhased and specified
-      ebgp_peerings:                                      # eBGP peerings which can advertise and receive anything
+      bgp_peerings:                                       # BGP peerings which can advertise and receive anything
         - name: MS
           remote_as: 65002
           peer_ip: 192.168.12.5
@@ -152,7 +152,7 @@ srv_routing:
   # - tenant: acme_prod                                 # Can add either protocols under a different VRF
   #   bgp:
   #     inet_peerings:
-  #     ebgp_peerings:
+  #     bgp_peerings:
   #   ospf:
 
 #### Advanced variables ####
