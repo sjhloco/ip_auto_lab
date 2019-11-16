@@ -178,9 +178,8 @@ Creates the BGP peerings or non-backbone OSPF process only on the border switche
       - *default_orig: no*                 Use *'yes'* or *'always'* to advertise a default route
       - *bgp_redist_in: yes*             Redistributes based on the tenant RT (are the SVIs redist into BGP with a tag)
       - *bgp_redist_out: [ALLOW-ANY]*     The network/prefix (seperated by ,) redist into this tenant (into BGP)
-
 - *srv_routing_adv.bgp:* Use to change the naming format for the BGP route-maps and prefix-lists
-- srv_routing_adv.ospf:* Use to change the naming format for the BGP route-maps, prefix-list and community list
+- *srv_routing_adv.ospf:* Use to change the naming format for the BGP route-maps, prefix-list and community list
 
 ## Rendering the Templates
 
