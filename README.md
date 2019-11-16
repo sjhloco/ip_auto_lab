@@ -16,6 +16,14 @@ They are currently in the process of incorporating orchestration/automation work
 
 Although the current network was built in the traditional hands on method, any expansion MUST be done via orchestration/automation tools.
 
-# Configuration backups
+### Configuration backups
 
-The backup_configs Ansible playbook when run will backup all device configs except for the F5 and upload them to this repo. Need to revisit the F5 backup at a later date.  
+*backup_configs* will backup all device configs upload them to this repo in the *configurations* directory.
+
+### Reporting
+
+*network_state_report* creates custom reports of network elements within the fabric.
+
+### Data Models
+
+*data_model* creates config snippets using declarative data models.
