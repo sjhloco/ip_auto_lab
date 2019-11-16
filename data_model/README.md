@@ -1,48 +1,55 @@
 # Data Models - Deploy Leaf and Spine
 
-The idea behind these data models is to deploy a leaf and spine architecture and its related services in a declarative manner. A dynamic inventory is created using either an inventory plugin or dynamic inventory script based on the information within the data models. Unless specifically stated all the elements of the data model can be changed as the none of the scripting or templating uses the actual contents to make decisions.
+The idea behind these data models is to deploy a leaf and spine architecture and its related services in a declarative manner. A dynamic inventory is created using either an inventory plugin or inventory script based on the information within the data models. Unless specifically stated all the elements of the data model can be changed as the none of the scripting or templating logic uses the actual contents to make decisions.
 
-This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but if need be can be done so within *fabric.yml*.
-- SPINE-to-LEAF = Eth1/1 - 1/10     
-- SPINE-to-Border = Eth1/11 - 1/15
-- BORDER-to-SPINE = Eth1/1 - 1/5
-- LEAF-to-SPINE = Eth1/1 - 1/5      
-- VPC Peer-link = Eth1/127 - 128
+This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml*.
+
+- SPINE-to-LEAF: Eth1/1 - 1/10
+- SPINE-to-BORDER: Eth1/11 - 1/15
+- LEAF-to-SPINE: Eth1/1 - 1/5
+- BORDER-to-SPINE: Eth1/1 - 1/5
+- VPC Peer-link: Eth1/127 - 128
 
 ## Core Data Model Elements
-These core elements are what is required to make this declarative and are used for the dynamic inventory creation as well as by the majority of the templates.
 
-**ansible.yml**
-<br/>*device_type:* Operating system of each device type (Spine, Leaf and Border)
+These core elements are the minimun requirements to create the declarative fabric. They are used for dynamic inventory creation as well as in some part by the majority of the Jinja2 templates.
 
-**base.yml**
-<br/>*device_name:* The naming format that the automatically generated node number is added to (in the format 0x). The names can be changed, but the last hyphen and name after it (SPINE, BORDER or LEAF) MUST not be changed the as that is what is used to in the scripting logic to generate the Ansible groups.
+**ansible.yml**\
+*device_type:* Operating system of each device type (Spine, Leaf and Border)
+
+**base.yml**\
+*device_name:* The naming format that the automatically generated node number is added to in double decimal format (0x). The start of the name can be changed, but the last hyphen and name after it (SPINE, BORDER or LEAF) MUST NOT be changed the as that is what is used to in the scripting logic to generate the Ansible groups.
+
 - spine_name: 'xx-SPINE'
 - border_name: 'xx-BORDER'
 - leaf_name: 'xx-LEAF'
 
-*addressing:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role specific increment and the node numbe. These must have the mask in prefix format (/). 
-- *lp_ip_subnet: 'x.x.x.x/32'* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Core OSPF and BGP peerings. By default will use .10 to .37
-- *mgmt_ip_subnet: 'x.x.x.x/27'* &nbsp;&nbsp;&nbsp; Needs to be at least /27 to cover max spine (4), leafs (10) and borders (4)
-- *vpc_peer_subnet: 'x.x.x.x/28'* &nbsp;&nbsp; VPC peer-link addresses. At least /28 to cover max leafs (10) and borders (4)
-- *srv_ospf_subnet: 'x.x.x.x/28'* &nbsp;&nbsp;&nbsp; Non-core OSPF process peerings between borders (4 IPs per-OSPF process)
+*addressing:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
 
-**fabric.yml**
-<br/>*network_size:* How big the network is, so the number of each switch type. border/leaf must be in increments of 2 as are in a VPC pair.
-- *num_spines: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 4
-- *num_borders: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 4
-- *num_leafs: x* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Can have a maximum of 10
+- *lp_ip_subnet: 'x.x.x.x/32'*        Core OSPF and BGP peerings. By default will use .10 to .37
+- *mgmt_ip_subnet: 'x.x.x.x/27'*      Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4) switches
+- *vpc_peer_subnet: 'x.x.x.x/28'*     VPC peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4) switches
+- *srv_ospf_subnet: 'x.x.x.x/28'*     Non-core OSPF process peerings between the border switches (4 IPs per-OSPF process)
 
-*address_incre:* # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses. Different increments are used dependant on the device role to keep the addresses unique. The below IP addesses are based on the default values
-- *spine_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spine IP addresses will be from .11 to .14
-- *border_ip: 15* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Border IP addresses will be from .16 to .19
-- *leaf_ip: 20* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Leaf IP addresses will be from .21 to .30
-- *sec_leaf_lp: 30* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of Leaf secondary loopback IP addresses will be from .31 to .35
-- *sec_border_lp: 35* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pair of BORDER secondary loopback addresses will be from .36 to .37
-- *vpc_leaf_ip: 0* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 is .2, Leaf3 is .3, etc
-- *vpc_border_ip: 10* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Start IP for Border Peer Links, so Border1 is .11, Border2 is .12, etc
+**fabric.yml**«
+*network_size:* How big the network is, so the number of each switch type. The border and leaf switches must be in increments of 2 as are in a VPC pair.
+
+- *num_spines: x*                     Can have a maximum of 4
+- *num_borders: x*                    Can have a maximum of 4
+- *num_leafs: x*                      Can have a maximum of 10
+
+*address_incre:* The increment that is added to the subnet and device hostname number to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addresses unique.
+
+- *spine_ip: 10*                      Spine IP addresses will be from .11 to .14
+- *border_ip: 15*                     Border IP addresses will be from .16 to .19
+- *leaf_ip: 20*                       Leaf IP addresses will be from .21 to .30
+- *sec_leaf_lp: 30*                   A pair of Leaf secondary loopback IP addresses will be from .31 to .35
+- *sec_border_lp: 35*                 A pair of Border secondary loopback addresses will be from .36 to .37
+- *vpc_leaf_ip: 0*                    Start IP for Leaf Peer Links, so Leaf1 is .1, Leaf2 is .2, Leaf3 is .3, etc
+- *vpc_border_ip: 10*                 Start IP for Border Peer Links, so Border1 is .11, Border2 is .12, etc
 
 ## Dynamic Inventory
+
 Have a dynamic inventory script and as well as an inventory plugin which both do the same thing. Dynamic inventory is better for trying things out to get the code correct as not constrained by Ansible in testing and printouts. The inventory plugin is easier when building the actaul inventory as it is already structured using Ansible class and methods. Inventory plugins is the recomended way but kept both as dynamic inventory is good for troublehsooting and trying out new elements in the invtory.
 
 The only things required to build the invnetorires are the core data model elements.
@@ -56,13 +63,14 @@ The dynamic script can be run using these cmds:
 The inventory pluggin can be run using these cmds. When not running against a playbook have to use this *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)*, guess can set as env var or set in config file.
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph** &nbsp;&nbsp; *Just outputs all groups*
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list** &nbsp;&nbsp; *All host_vars, groups and members*
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**         
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**
 **ansible-playbook playbook.yml -i inv_from_vars_cfg.yml** &nbsp;&nbsp;&nbsp;&nbsp; *To run against a playbook*
 
 ## Data Models
+
 **ansible.yml -** Contains the login and Ansible settings that would normally be stored in *all.yml*. The reason I dont use  *group_vars* is that the inventory plugin would add each variable in *all.yml* to every devices *host_var*.
 
-- *ansible_python_interpreter:* Python location on the Ansible host (operating system specific)           
+- *ansible_python_interpreter:* Python location on the Ansible host (operating system specific)
 - *dir_path:* Base directory Location to store the generated configuration snippets
 - *creds_all:* User credentials for connecting to devices
 - *device_type:* Operating system of each device type (Spine, Leaf and Border)
@@ -86,10 +94,11 @@ The inventory pluggin can be run using these cmds. When not running against a pl
 
 ## Service Data Model
 
-**services.yml -** All the services that are delivered by the fabric. These are the provision of tenants, vlans, interfaces, external BGP peerings and non-core OSPF domains. All are provided on leaf and border switches expect for BGP and OSPF which are only provisioned on the borders. 
+**services.yml -** All the services that are delivered by the fabric. These are the provision of tenants, vlans, interfaces, external BGP peerings and non-core OSPF domains. All are provided on leaf and border switches expect for BGP and OSPF which are only provisioned on the borders.
 <br/><br/>Each service has the manadatory core elements required to provide the service and the optional advanced elements if customization is required.
 
 ### Tenants & VLANs
+
 - *srv_tenants:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used to create tenants (VRF), L3VNIs, SVIs, L2VNIs and VLANs
   - *tenant_name:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name of the VRF, it will only be created if it is *l3_tenant*
   - *l3_tenant:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; If *yes* it will create a VRF, L3VNI and the associated VLAN and SVI
@@ -107,6 +116,7 @@ The inventory pluggin can be run using these cmds. When not running against a pl
 - *srv_tenants_adv.bgp:*&nbsp;&nbsp; Options to change the redistribution route-map name and tag value
 
 ### Interfaces
+
 - *srv_ports:* &nbsp;&nbsp;&nbsp;&nbsp; Used to create the single and dual homed interfaces. Any interface can be delegated as a trunk, access or Layer 3 port. *single-homed* and *dual-homed* are dictionary keys with the values being lists of interfaces. OSPF can only be enabled on a Border switch Layer 3 interface
   - *single_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For devices only attached to one switch
     - *description:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Interface description
@@ -114,9 +124,9 @@ The inventory pluggin can be run using these cmds. When not running against a pl
     - *port_variable:* &nbsp;&nbsp;&nbsp;&nbsp; If *access* is the vlan, if *trunk* the allowed vlans (seperated by ,) and if *layer3* the IP address
     - *ospf:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Optionally enable OSPF. Specify the process and hello, area is automatically worked out
     - *switch:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name of the switch to which the port is added
-  - *dual_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For devices attached in a port-channel to two switches                            
-    - *po_mode:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Same settings as single-homed, but must 
-    - *switch:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Only specify the odd numbered switch and it is automatically created on the VPC pair.  
+  - *dual_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For devices attached in a port-channel to two switches
+    - *po_mode:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Same settings as single-homed, but must
+    - *switch:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Only specify the odd numbered switch and it is automatically created on the VPC pair.
 
 - *srv_ports_adv:* &nbsp;&nbsp;&nbsp;&nbsp; Modify the reserved interface, port-channel and vpc ranges that server ports can be automatically assigned from. This applies to all leaf and border switches
   - *dual_homed:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Used only for dual-homed devices
@@ -129,7 +139,8 @@ The inventory pluggin can be run using these cmds. When not running against a pl
     - *last_int: Ethernet1/60* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  Last interface
 
 ### Routing Protocols
-- *srv_routing:* &nbsp;&nbsp;&nbsp;&nbsp; Used to create BGP peerings or non-backbone OSPF process only on the border switches. For redistribution and filtering (*allowed_in* and *allowed_out*) can list the required networks or use the pre-built prefix-lists of ALLOW-ALL, DENY-ALL and DEFAULT. 
+
+- *srv_routing:* &nbsp;&nbsp;&nbsp;&nbsp; Used to create BGP peerings or non-backbone OSPF process only on the border switches. For redistribution and filtering (*allowed_in* and *allowed_out*) can list the required networks or use the pre-built prefix-lists of ALLOW-ALL, DENY-ALL and DEFAULT.
   - *tenant:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp The VRF that all the routing protocols are in
     - *bgp:*
       - *inet_peerings:* &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ISP peerings which only accept a default-route in
@@ -144,7 +155,7 @@ The inventory pluggin can be run using these cmds. When not running against a pl
         - *remote_as:*
         - *peer_ip:*
         - *description:*
-        - *allowed_in: [ALLOW-ANY]* &nbsp;&nbsp;&nbsp; Specify the network/prefixes or use ALLOW-ANY, DENY-ANY or DEFAULT      
+        - *allowed_in: [ALLOW-ANY]* &nbsp;&nbsp;&nbsp; Specify the network/prefixes or use ALLOW-ANY, DENY-ANY or DEFAULT
         - *allowed_out: [DENY-ALL]*
         - *timers: [3, 9]
     - *ospf:* &nbsp;&nbsp;&nbsp;&nbsp; Only creates the OSPF process, interfaces are added using the 'Device ports' service
@@ -155,20 +166,23 @@ The inventory pluggin can be run using these cmds. When not running against a pl
       - *bgp_redist_in: yes* &nbsp;&nbsp;&nbsp;&nbsp; Redistributes based on the tenant RT, these are the SVIs redist into BGP with a tag
       - *bgp_redist_out: [ALLOW-ANY]* &nbsp;&nbsp;&nbsp;&nbsp; The network/prefix (seperated by ,) redist into this tenant (into BGP).
 
-- *srv_routing_adv.bgp:* &nbsp;&nbsp;&nbsp;&nbsp; Use to change the naming format for the BGP route-maps and prefix-lists 
+- *srv_routing_adv.bgp:* &nbsp;&nbsp;&nbsp;&nbsp; Use to change the naming format for the BGP route-maps and prefix-lists
 - **dir**
 srv_routing_adv.ospf:* &nbsp;&nbsp;&nbsp;&nbsp; Use to change the naming format for the BGP route-maps, prefix-list and community list
 
 ## Notes/ Caveats/ Improvemnents/ Validation
+
 Simple playbook runs the different plays to create the sperate config snippets and stores in a floder specifically for that device. The default location for this is *~/device_configs* but can be changed in ansible.yml. Specific plays can be run individually using the following tags.
-- **dir** &nbsp;&nbsp; Deletes the base directory (*device_configs*) and recreates it 
+
+- **dir** &nbsp;&nbsp; Deletes the base directory (*device_configs*) and recreates it
 - **base** &nbsp;&nbsp; Renders *base_template.j2* with *base.yml* and stores the generated output in *base.cfg*
 - **fabric** &nbsp;&nbsp; Renders *fabric_template.j2* with *fabric.yml* and stores the generated output in *fabric.cfg*
 - **services** &nbsp;&nbsp; Renders *services_template.j2* with *services.yml* and stores the generated output in *services.cfg*
 
 ## Notes/ Caveats/ Improvemnents/ Validation
+
 The services data model is a bit big and difficult for a user to edit, therefore use other playbooks to addd services that will update this file. Another layer of abstraction.
-<br/>Would be better to refactor and pass all varible files through Filter pluggins to create new varible files. By doing that woill simplify the Jinja and get rid of some of the nesting. 
+<br/>Would be better to refactor and pass all varible files through Filter pluggins to create new varible files. By doing that woill simplify the Jinja and get rid of some of the nesting.
 <br/>Jinja template needs to be more simple so it easy for people with little codong knowledge to be able to update if an any of the device OS config changes
 <br/>Want to deploy with replace but will be difficult as device configs are in a very specific order. How do you handle:
 <br/>-THings like VLANs added later but wiht lower VLNA number, need to order code in correct order
