@@ -61,8 +61,8 @@ The inventory script can be run using these cmds:\
 **ansible-playbook playbook.yml -i dyn_inv_script.py**               *Run the playbook using the dynamic inventory*
 
 When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.\
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph** *groups*\
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**  *All*\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**\
+**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**\
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**\
 **ansible-playbook playbook.yml -i inv_from_vars_cfg.yml**                                                  *To run against a playbook*
 
@@ -103,11 +103,11 @@ Used to create tenants (VRF), L3VNIs, SVIs, L2VNIs and VLANs. If it is a L3 tena
 - *srv_tenants:*
   - *tenant_name:*              Name of the VRF, only created if it is *l3_tenant*
   - *l3_tenant:*                If *yes* it will create a VRF, L3VNI and the associated VLAN and SVI
-      - *vlans:*                List of VLANs within this tenant
-      - *num:*                  VLAN name
-      - *name:*                 VLAN number
-      - *ip_addr:*              Adding an IP makes it a L3 VLAN and creates the SVI
-      - *ipv4_bgp_redist:*      *Yes* will redistribute the SVI into the BGP IPv4 address-family
+    - *vlans:*                  List of VLANs within this tenant
+    - *num:*                    VLAN name
+    - *name:*                   VLAN number
+    - *ip_addr:*                Adding an IP makes it a L3 VLAN and creates the SVI
+    - *ipv4_bgp_redist:*        *Yes* will redistribute the SVI into the BGP IPv4 address-family
 
 The L3VNIs and L2VNIs are automatically generated from the base VNI values. By default the L3VNIs/SVIs start at 3001 and are incremented by 1 for each L3 tenant. The L2VNIs start at 10000, are created per-vlan by adding the vlan number to this value and are incremented by 10000 per tenant.
 
@@ -140,12 +140,12 @@ Used to create the single and dual homed interfaces. Any interface can be delega
 Modify which interfaces are reserved for single and dual-homed port assignment as well the port-channel and vpc ranges used. This applies to all leaf and border switches.
 
 - *srv_ports_adv:*
-  - *dual_homed:*                    
+  - *dual_homed:*
     - *first_int: Ethernet1/21*      First interface
     - *last_int: Ethernet1/50*       Last interface
     - *po: 21*                                 First PortChannel used
     - *vpc: 21*                                First VPC used
-  - *single_homed:*                  
+  - *single_homed:*
     - *first_int: Ethernet1/51*      First interface
     - *last_int: Ethernet1/60*       Last interface
 
@@ -193,21 +193,24 @@ Simple playbook that runs the different plays to create the seperate configurati
 
 ## Notes/ Caveats/ Improvemnents/ Validation
 
-The services data model is a bit big and difficult for a user to edit, therefore use other playbooks to addd services that will update this file. Another layer of abstraction.
-<br/>Would be better to refactor and pass all varible files through Filter pluggins to create new varible files. By doing that woill simplify the Jinja and get rid of some of the nesting.
-<br/>Jinja template needs to be more simple so it easy for people with little codong knowledge to be able to update if an any of the device OS config changes
-<br/>Want to deploy with replace but will be difficult as device configs are in a very specific order. How do you handle:
-<br/>-THings like VLANs added later but wiht lower VLNA number, need to order code in correct order
-<br/>-When hyphen is used, for exampel mulitple vlans
-<br/>-join together the snipets when different config elements in one snippets needs to be in different locations in config file?
-<br/>
-<br/>When run play book, fails sometimes on directory dlettion or creation, need ot find out why
-<br/><br/>
-Going to need to have two types of validation
-<br/>-Sanity check the input, make sure all formating is correct and values legit beforre even try to build the config
-<br/>-CHeck after deployment of the config
+Improve the naming format for elements within files and those gained from filter plugins. Will be easier to then see where they are from in the templates.\
+Pass all the varible files throughpython plugins to create the variables. By doing that it will simplify the templates and get rid of some of the nesting.\
+The templates needs to be simpler so that it is easy for people with little coding knowledge to be able to update.\
+&nbsp;
+The services data model is not as simple and declaritive as would like. Rather than editing this to add newthese services should probably create new plays soo that when a service is to be edited that play makes the changes to the services.yml file. Will add another layer of abstraction.\
+&nbsp;
+How to integrate with IPAM (netbpx)?\
+-Do you use the netbox inventory plugin to pull the elements down for interfaces and IPs?\
+-Do you build API calls into your own inventory plugin?/
+-Do you auto-generate how am currently doing and then push that config info to IPAM?\
 
-<br/><br/>
-How to integrate IPAM. DO you use a plugin to pull the elements down for interfaces and IPs, or do you autogenerate and push that config to IPAM?
-
-<br/>Improve naming format for elements within files and those from filter plugins
+When I run playbook it fails sometimes on directory deletion so have to rerun. Need to investigate why.\
+&nbsp;
+Want to deploy the configurations by replacing the whole configuration. It will be difficult to do as the device configs have to be in the exact correct order. How do you handle:\
+-Things added but in the config reprdered by lower numeric or alphabetic value. For example VLANs or VNIs.\
+-Config where it uses hyphen is used, for example the VLANs list.\
+-Join together the configsnipets when different config elements in one snippets needs to be in different locations in the config file?\
+&nbsp;
+Going to need to have two types of validation:
+-Sanity check the input. Make sure all formating is correct and the entered values are legitimate before it even tries to build the config snippets.\
+-Once deployed need to make sure connnectiosn are as expected (LLDP), protocols up (BGP, OSPF) and services functioning (VXLAN, port-channels).\
