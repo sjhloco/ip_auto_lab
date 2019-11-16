@@ -191,26 +191,26 @@ Simple playbook that runs the different plays to create the seperate configurati
 - **fabric**        Renders *fabric_template.j2* with *fabric.yml* and stores the generated output in *fabric.cfg*
 - **services**    Renders *services_template.j2* with *services.yml* and stores the generated output in *services.cfg*
 
-## Notes/ Caveats/ Improvemnents/ Validation
+## Notes and Improvements
 
-Improve the naming format for elements within files and those gained from filter plugins. Will be easier to then see where they are from in the templates.\
-Pass all the varible files throughpython plugins to create the variables. By doing that it will simplify the templates and get rid of some of the nesting.\
+Improve the naming format for elements within files and those gained from filter plugins. This will make it easier to see where they are from in the templates.\
+Pass all the data model files through python plugins to create the complet data models to be used in the templates. By doing that it will simplify the templates and get rid of some of the nesting.\
 The templates needs to be simpler so that it is easy for people with little coding knowledge to be able to update.\
-&nbsp;
-The services data model is not as simple and declaritive as would like. Rather than editing this to add newthese services should probably create new plays soo that when a service is to be edited that play makes the changes to the services.yml file. Will add another layer of abstraction.\
-&nbsp;
-How to integrate with IPAM (netbpx)?\
+
+The services data model is not as simple and declaritive as would like. Rather than editing this to add to these services should probably create new plays so that when a service is to be added that play makes the changes to the services.yml file. This will add another layer of abstraction.\
+
+How to integrate with IPAM (netbox)?\
 -Do you use the netbox inventory plugin to pull the elements down for interfaces and IPs?\
--Do you build API calls into your own inventory plugin?/
+-Do you build API calls into your own inventory plugin?\
 -Do you auto-generate how am currently doing and then push that config info to IPAM?\
 
 When I run playbook it fails sometimes on directory deletion so have to rerun. Need to investigate why.\
-&nbsp;
-Want to deploy the configurations by replacing the whole configuration. It will be difficult to do as the device configs have to be in the exact correct order. How do you handle:\
--Things added but in the config reprdered by lower numeric or alphabetic value. For example VLANs or VNIs.\
--Config where it uses hyphen is used, for example the VLANs list.\
--Join together the configsnipets when different config elements in one snippets needs to be in different locations in the config file?\
-&nbsp;
-Going to need to have two types of validation:
+
+Want to deploy by replacing the whole configuration. It will be difficult to do as the device configs have to be in the correct exact order. How do you handle that?\
+-The OS config reorders some elements by lower numeric or alphabetic value such as VLANs or VNIs.\
+-Configuration where it uses hyphen is used, for example the VLANs list.\
+-Joining together the config snipets when you have different config elements in one snippets that need to be in different locations in the config file?\
+
+Going to need to have two types of validation:\
 -Sanity check the input. Make sure all formating is correct and the entered values are legitimate before it even tries to build the config snippets.\
--Once deployed need to make sure connnectiosn are as expected (LLDP), protocols up (BGP, OSPF) and services functioning (VXLAN, port-channels).\
+-Once deployed need to make sure connnectiosn are as expected (LLDP), protocols up (BGP, OSPF) and services functioning (VXLAN, port-channels).
