@@ -1,0 +1,75 @@
+---
+# This playbook is used to generate the different configuration snippets
+
+# 1. Create the file structure
+- name: "Create file structure"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+  tasks:
+  - block:
+    - name: "SYS >> Delete the directory"
+      file: path="{{ ans.dir_path }}" state=absent
+      changed_when: False
+    - name: "Creating file structure"
+      file: path="{{ ans.dir_path }}/{{ inventory_hostname }}" state=directory
+      changed_when: False
+    check_mode: False
+    tags: dir
+
+# 2. Create the base config snippets using basetemplate.j2
+- name: "SYS >> Create base config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+  tasks:
+  - name: "SYS >> Create config snippets"
+    template:
+      src: base_template.j2
+      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/base.cfg"
+    tags: base
+
+# 3. Create the fabric config snippets using fabric_template.j2
+- name: "SYS >> Create fabric config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+    - vars/fabric.yml
+  tasks:
+  - name: "SYS >> Create config snippets"
+    template:
+      src: fabric_template.j2
+      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
+    tags: fabric
+
+# 4. Create the service config snippets using service_template.j2
+- name: "SYS >> Create services config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+    - vars/fabric.yml
+    - vars/services.yml
+  tasks:
+  - block:
+    - name: "SYS >> Use Python to create complete data-model"
+      set_fact:
+        srv_tenants_dm: "{{ srv_tenants |srv_tenants_dm(srv_tenants_adv.base_vni) }}"   # Completes data-model with VNI
+        srv_ports_dm: "{{ srv_ports |srv_ports_dm(srv_ports_adv, srv_tenants) }}"      # Completes data-model with interface & PO/VPC
+      changed_when: false
+      run_once: true
+    - name: "SYS >> Create config snippets"
+      template:
+        src: services_template.j2
+        dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/services.cfg"
+      changed_when: false
+    # - debug:
+    #     var: hostvars
+    tags: services
+

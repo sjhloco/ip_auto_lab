@@ -1,0 +1,5 @@
+{% set rtr_lp = fbc.adv.lp.rtr.keys() |list | first %}
+{% set server_ip = groups['leaf'] + groups['border'] %}
+{% for lf in groups['leaf'] + groups['border'] %}
+{{ lf }}
+{% endfor %}

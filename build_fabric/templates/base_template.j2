@@ -1,0 +1,109 @@
+hostname {{ inventory_hostname }}
+vdc {{ inventory_hostname }} id 1
+  limit-resource vlan minimum 16 maximum 4094
+  limit-resource vrf minimum 2 maximum 4096
+  limit-resource port-channel minimum 0 maximum 511
+  limit-resource u4route-mem minimum 248 maximum 248
+  limit-resource u6route-mem minimum 96 maximum 96
+  limit-resource m4route-mem minimum 58 maximum 58
+  limit-resource m6route-mem minimum 8 maximum 8
+
+feature nxapi
+feature scp-server
+feature tacacs+
+cfs eth distribute
+nv overlay evpn
+feature ospf
+feature bgp
+feature fabric forwarding
+feature interface-vlan
+feature vn-segment-vlan-based
+feature lacp
+feature vpc
+feature lldp
+feature bfd
+clock timezone GMT 0 0
+clock summer-time BST 5 sun mar 02:00 5 sun oct 02:00 60
+feature nv overlay
+{# Username and authetication based settings #}
+no password strength-check
+{# Loops through the list of users #}
+{% for usr in bse.users %}
+username {{ usr.username }} password 5 {{ usr.password }} role {{ usr.role }}
+{% endfor %}
+ip domain-lookup
+ip domain-name {{ bse_services.domain }}
+ip name-server {{ bse_services.dns.prim }} {{ bse_services.dns.sec }}
+tacacs-server key 7 {{ bse_services.tacacs.key }}
+{# Loops through the list of tacacs servers #}
+{% for srv in bse_services.tacacs.servers %}
+tacacs-server host {{ srv }}
+{% endfor %}
+aaa group server tacacs+ {{ bse_services.tacacs.grp_name }}
+{% for srv in bse_services.tacacs.servers %}
+  server {{ srv }}
+{% endfor %}
+  source-interface {{ bse_services.src_int }}
+crypto key param rsa label {{ inventory_hostname }}.{{ bse_services.domain }} modulus 2048
+system default switchport shutdown
+logging message interface type ethernet description
+{# Managment access-lists #}
+ip access-list {{ bse_acl.snmp.name }}
+{# The start sequence number that has 10 added to it with each loop iteration #}
+{% set seq = namespace(cnt=10) %}
+{% for host in bse_acl.snmp.source %}
+  {{ seq.cnt }} permit {{ bse_acl.snmp.port[0] }} {{ host }} any
+{% set seq.cnt= seq.cnt + 10 %}
+{% endfor %}
+  {{ seq.cnt }} deny ip any any log
+ip access-list {{ bse_acl.ssh.name }}
+{% set seq = namespace(cnt=10) %}
+{% for host in bse_acl.ssh.source %}
+  {{ seq.cnt }} permit {{ bse_acl.ssh.port[0] }} {{ host }} any
+{% set seq.cnt= seq.cnt + 10 %}
+{% endfor %}
+  {{ seq.cnt }} deny ip any any log
+copp profile strict
+snmp-server source-interface traps {{ bse_services.src_int }}
+snmp-server source-interface informs {{ bse_services.src_int }}
+snmp-server user admin network-admin auth md5 0x99187947008c0a20401eac07e9fb58c3 priv 0x99187947008c0a20401eac07e9fb58c3 localizedkey
+snmp-server host {{ bse_services.snmp.host }} traps version 2c {{ bse_services.snmp.comm }}
+rmon event 1 description FATAL(1) owner PMON@FATAL
+rmon event 2 description CRITICAL(2) owner PMON@CRITICAL
+rmon event 3 description ERROR(3) owner PMON@ERROR
+rmon event 4 description WARNING(4) owner PMON@WARNING
+rmon event 5 description INFORMATION(5) owner PMON@INFO
+snmp-server community {{ bse_services.snmp.comm }} group network-operator
+snmp-server community {{ bse_services.snmp.comm }} use-ipv4acl {{ bse_acl.snmp.name }}
+{% for ntp in bse_services.ntp.server %}
+ntp server {{ ntp }} use-vrf default
+{% endfor %}
+ntp source-interface {{ bse_services.src_int }}
+aaa authentication login default group {{ bse_services.tacacs.grp_name }}
+aaa authentication login console local
+aaa authorization commands default group {{ bse_services.tacacs.grp_name }} local
+aaa accounting default group {{ bse_services.tacacs.grp_name }}
+aaa authentication login error-enable
+
+{# Only adds the leafs as they are the only devices with SVIs  #}
+{% if device_name.leaf_name in inventory_hostname %}
+fabric forwarding anycast-gateway-mac {{ bse_adv.acast_gw_mac }}
+{% endif %}
+
+{# Management and conole access  #}
+interface mgmt0
+  vrf member management
+  ip address {{ ansible_host }}/{{ addressing.mgmt_ip_subnet.split('/')[1] }}
+  ip access-group {{ bse_acl.ssh.name }} in
+cli alias name wr copy running-config startup-config
+line console
+  exec-timeout {{ bse_adv.exec_timeout.console }}
+line vty
+  exec-timeout {{ bse_adv.exec_timeout.vty }}
+  ip access-group {{ bse_acl.ssh.name }} in
+boot nxos bootflash:/{{ bse_adv.image }}
+
+{% for log in bse_services.log.server %}
+logging server {{ log }}
+{% endfor %}
+logging source-interface {{ bse_services.src_int }}

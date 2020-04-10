@@ -1,0 +1,126 @@
+{% set rtr_lp = fbc.adv.lp.rtr.keys() |list | first %}
+{% set vtep_lp = fbc.adv.lp.vtep.keys() |list | first %}
+
+########## loopbacks ##########
+{% for intf, details in intf_lp.items() %}
+interface {{ intf }}
+  description {{ details.values() |list| first }}
+  ip address {{ details.keys() |list| first }}
+{% if details.values() |length  == 2 %}
+  ip address {{ details.keys() |list| last }} secondary
+{% endif %}
+  ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
+
+{% endfor %}
+
+########## Fabric Interfaces ##########
+{% for intf, descr in intf_fbc.items() %}
+interface {{ intf }}
+  description UPLINK > {{ descr }}
+  no switchport
+  medium p2p
+  ip unnumbered {{ rtr_lp }}
+  ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
+  no shutdown
+
+{% endfor %}
+
+{% if bse.device_name.spine not in inventory_hostname %}
+#################### VPC Config ####################
+{% for intf, descr in intf_mlag.items() %}
+interface {{ intf }}
+  description {{ descr }}
+  switchport mode trunk
+  switchport trunk allowed vlan all
+  vpc peer-link
+  spanning-tree port type network
+{% if fbc.adv.bse_intf.ec_fmt not in intf %}
+  channel-group {{ fbc.adv.mlag.peer_po }} mode active
+{% endif %}
+  no shut
+
+{% endfor %}
+vlan {{ fbc.adv.mlag.peer_vlan }}
+  name special_svi_over_peer-link
+
+interface Vlan {{ fbc.adv.mlag.peer_vlan }}
+  description special_svi_over_peer-link
+  no shutdown
+  medium p2p
+  no ip redirects
+  ip address {{ mlag_peer_ip }}
+  no ipv6 redirects
+  ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
+
+vpc domain {{ fbc.adv.mlag.domain }}
+  peer-switch
+{# Config specific for all leaf and border switches with an odd or even number in hostname #}
+{% if inventory_hostname[-2:]|int is odd %}
+  role priority 8192
+{# The keepalive peer is the mgmt IP +1 (is the mgmt IP of odd the even switch) #}
+  peer-keepalive destination {{ ansible_host | ipmath(1) }} source {{ ansible_host }} vrf management
+{% else %}
+  role priority 16384
+  peer-keepalive destination {{ ansible_host | ipmath(-1) }} source {{ ansible_host }} vrf management
+{% endif %}
+  peer-gateway
+  ip arp synchronize
+  auto-recovery
+
+#################### VXLAN Config ####################
+interface nve1
+  advertise virtual-rmac
+  no shutdown
+  host-reachability protocol bgp
+  source-interface {{ vtep_lp }}
+{% endif %}
+
+#################### OSPF Config ####################
+router ospf {{ fbc.route.ospf.pro }}
+ router-id {{ intf_lp[rtr_lp].keys() |list |last |ipaddr('address') }}
+
+#################### BGP Config ####################
+router bgp {{ fbc.route.bgp.as_num }}
+  router-id {{ intf_lp[rtr_lp].keys() |list |last |ipaddr('address') }}
+  address-family l2vpn evpn
+{# This cmd is only needed on leaf & border #}
+{% if bse.device_name.spine not in inventory_hostname %}
+    advertise-pip
+{% endif %}
+    retain route-target all
+  template peer fabric_peering
+    remote-as {{ fbc.route.bgp.as_num }}
+    update-source {{ rtr_lp }}
+    timers 3 9
+    address-family ipv4 unicast
+      send-community
+      send-community extended
+      soft-reconfiguration inbound
+{# Spines need to be Route Reflectors (ipv4) #}
+{% if bse.device_name.spine in inventory_hostname %}
+      route-reflector-client
+{% endif %}
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+{# Spines need to be Route Reflectors (l2vpn) #}
+{% if bse.device_name.spine in inventory_hostname %}
+      route-reflector-client
+{% endif %}
+{### Create the spines peers based on members of the leaf and border groups ###}
+{% if bse.device_name.spine in inventory_hostname %}
+{# loop through the leaf and border groups and get loopback hostvar #}
+{% for dvc in groups['leaf'] + groups['border'] %}
+  neighbor {{ hostvars[dvc]['intf_lp'][rtr_lp].keys() |list |last |ipaddr('address') }}
+    description {{ dvc }}
+    inherit peer fabric_peering
+{% endfor %}
+{### Create the border and leaf peers based on members of Ansible spine groups ###}
+{% else %}
+{# loop through the spine group and get loopback hostvar #}
+{% for sp in groups['spine'] %}
+  neighbor {{ hostvars[sp]['intf_lp'][rtr_lp].keys() |list |last |ipaddr('address') }}
+    description {{ sp }}
+    inherit peer fabric_peering
+{% endfor %}
+{% endif %}

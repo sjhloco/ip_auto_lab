@@ -1,0 +1,29 @@
+---
+
+- name: "Create file structure"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+  tasks:
+- name: "SYS >> Create fabric config snippets"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+    - vars/base.yml
+    - vars/fabric.yml
+  tasks:
+  - name: "SYS >> Create config snippets"
+    template:
+      src: template.j2
+      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
+    tags: tmp
+  - name: "SYS >> Print to screen"
+    debug:
+      # msg: "{{ fbc.adv.lp.rtr.keys() |list }}"
+      msg: "{{ intf_lp.fbc.adv.lp.rtr.key() | list }}"
+      # msg: "{{ intf_lp.loopback0.keys() | list | ipaddr('address') }}"
+      # msg:  "{{ '192.168.100.16/32' | ipaddr('address') }}"
+    tags: prt
+

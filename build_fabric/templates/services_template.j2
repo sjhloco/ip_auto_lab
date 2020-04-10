@@ -1,0 +1,433 @@
+{################################################# Service: Tenant #################################################}
+{# Need to workout how to create this cmd dynamically #}
+vlan 1-2,10-12,20,50-51,901
+
+{#### Create VLANs, VRFs, and SVIs ####}
+#################### VLANs ####################
+{% for tn in srv_tenants_dm %}{% for vl in tn.vlans %}
+{# Create only L2VNI VLANs with a L3 tenant on border Switches #}
+{% if device_name.border_name in inventory_hostname and tn.l3_tenant is sameas false %}
+vlan {{ vl.num }}
+  name {{ vl.name }}
+  vn-segment {{ vl.l2vni }}
+{# Create all the L2VNI VLANs on Leaf Switches #}
+{% elif device_name.leaf_name in inventory_hostname %}
+vlan {{ vl.num }}
+  name {{ vl.name }}
+  vn-segment {{ vl.l2vni }}
+{% endif %}{% endfor %}{% endfor %}
+{# Create all the L3VNI VLANs on leaf and border #}
+{% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
+vlan {{ tn.tn_vlan }}
+  name {{ tn.tenant_name }}
+  vn-segment {{ tn.l3vni }}
+{% endif %}{% endfor %}
+!
+{# Create all the tenants (VRFs) on leaf and border #}
+spanning-tree vlan 1-3967 priority 4096
+#################### VRF & SVIs ####################
+{% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
+vrf context {{ tn.tenant_name }}
+  vni {{ tn.l3vni }}
+  rd auto
+  address-family ipv4 unicast
+    route-target both auto
+    route-target both auto evpn
+{% endif %}{% endfor %}
+!
+hardware access-list tcam region racl 512
+hardware access-list tcam region arp-ether 256 double-wide
+!
+{% for tn in srv_tenants_dm %}{% for vl in tn.vlans %}
+{# Create all the SVIs (for L2VNIs) on the leaf switches #}
+{% if device_name.leaf_name in inventory_hostname and tn.l3_tenant is sameas true %}
+{% if vl.ip_addr != 'none' %}
+interface vlan{{ vl.num }}
+  no shutdown
+  vrf member {{ tn.tenant_name }}
+  no ip redirects
+{# Add a tag if the SVI is to be redistributed into IPv4 addr family #}
+{% if vl.ipv4_bgp_redist == true %}
+  ip address {{ vl.ip_addr }} tag {{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni)}}
+{% else %}
+  ip address {{ vl.ip_addr }}
+{% endif %}
+  no ipv6 redirects
+  fabric forwarding mode anycast-gateway
+{% endif %}{% endif %}
+{% endfor %}{% endfor %}
+!
+{# Create all the SVIs (for L3VNIs) on leaf and spine switches#}
+{% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
+interface Vlan{{ tn.tn_vlan }}
+  no shutdown
+  vrf member {{ tn.tenant_name }}
+  no ip redirects
+  ip forward
+  no ipv6 redirects
+{% endif %}{% endfor %}
+
+{#### Create VXLAN and BGP config ####}
+#################### VXLAN ####################
+interface nve1
+{# Associate the L3VNIs to NVE on leaf and border switches#}
+{% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
+  member vni {{ tn.l3vni }} associate-vrf
+{% endif %}{% endfor %}
+{# Associate the L2VNIs with no SVI on border switches #}
+{% for tn in srv_tenants_dm %}{% for vl in tn.vlans %}
+{% if device_name.border_name in inventory_hostname and tn.l3_tenant is sameas false %}
+  member vni {{ vl.l2vni }}
+    suppress-arp
+    ingress-replication protocol bgp
+{# Associate all L2VNIs on leaf switches #}
+{% elif device_name.leaf_name in inventory_hostname %}
+  member vni {{ vl.l2vni }}
+    suppress-arp
+    ingress-replication protocol bgp
+{% endif %}{% endfor %}
+{% endfor %}
+
+#################### BGP ####################
+{% for tn in srv_tenants_dm %}
+{# Only create the route-map on the leaf switches if any of the tenant SVIs have been redistibuted #}
+{% if device_name.leaf_name in inventory_hostname and tn.redist is defined %}
+route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",fbc.bgp.as_num) }} permit 10
+  match tag {{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni)}}
+{% endif %}
+{% endfor %}
+!
+router bgp 65001
+{% for tn in srv_tenants_dm %}{% if tn.l3_tenant is sameas true %}
+  vrf {{ tn.tenant_name }}
+    address-family ipv4 unicast
+      advertise l2vpn evpn
+{# Only associate the route-map on the leaf switchesif any of the tenant SVIs have been redistibuted #}
+{% if device_name.leaf_name in inventory_hostname and tn.redist is defined %}
+      redistribute direct route-map {{ srv_tenants_adv.bgp.ipv4_redist_rm_name | replace("vrf",tn.tenant_name) | replace("as",fbc.bgp.as_num) }}
+{% endif %}
+{% endif %}{% endfor %}
+
+#################### EVPN ####################
+evpn
+{% for tn in srv_tenants_dm %}{% for vl in tn.vlans %}
+{# Associate the L2VNIs with no SVI on border switches #}
+{% if device_name.border_name in inventory_hostname and tn.l3_tenant is sameas false %}
+  vni {{ vl.l2vni }} l2
+    rd auto
+    route-target import auto
+    route-target export auto
+{# Associate all L2VNIs on leaf switches #}
+{% elif device_name.leaf_name in inventory_hostname %}
+  vni {{ vl.l2vni }} l2
+    rd auto
+    route-target import auto
+    route-target export auto
+{% endif %}
+{% endfor %}{% endfor %}
+
+{################################################# Service: Device Ports #################################################}
+#################### Single-Homed Interfaces ####################
+{### Create the single homed interfaces ###}
+{% for port in srv_ports_dm.sh_ports %}{% if port.switch == inventory_hostname %}
+interface {{ port.interface }}
+{# Create the single homed access port #}
+{% if port.port_type == 'access' %}
+  description Access > {{ port.description }}
+  switchport mode access
+  switchport access vlan {{ port.port_variable }}
+{# Create the single homed trunk port #}
+{% elif port.port_type == 'trunk' %}
+  description Access > {{ port.description }}
+  switchport mode trunk
+  switchport trunk allowed vlan {{ port.port_variable }}
+{# Create the single homed layer3 port #}
+{% elif port.port_type == 'layer3' %}
+  description P-t-P > {{ port.description }}
+  no switchport
+  vrf member {{ port.vrf }}
+  ip address {{ port.port_variable }}
+{% if port.ospf is defined and device_name.border_name in port.switch %}
+  ip ospf hello-interval {{ port.ospf[1] }}
+  no ip ospf passive-interface
+{# Required to get OSPF area #}
+{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+{% if port.ospf[0] == ospf.pro %}
+{% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area }}
+{% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
+{# adds 1 to the area #}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
+{% endif %}{% endif %}
+{% endfor %}{% endif %}{% endfor %}
+{% endif %}{% endif %}
+  no shutdown
+!
+{% endif %}{% endfor %}
+
+
+#################### Port-channels ####################
+{### Create the dual homed port-channels ###}
+{% for port in srv_ports_dm.dh_ports %}
+{# Formula adds 1 to current switch to so created on both switches in VPC pair #}
+{% if (port.switch == inventory_hostname) or (port.switch[:-2] + "%02d" |format(port.switch[-2:] |int+1) == inventory_hostname) %}
+interface port-channel {{ port.po}}
+  description PC > {{ port.description }}
+{# Create the dual homed access port #}
+{% if port.port_type == 'access' %}
+  switchport mode access
+  switchport access vlan {{ port.port_variable }}
+{# Create the dual homed trunk port #}
+{% elif port.port_type == 'trunk' %}
+  switchport mode trunk
+  switchport trunk allowed vlan {{ port.port_variable }}
+{# Create the dual homed layer3 port #}
+{% elif port.port_type == 'layer3' %}
+  no switchport
+  vrf member {{ port.vrf }}
+  ip address {{ port.port_variable }}
+{% if port.ospf is defined and device_name.border_name in port.switch %}
+  ip ospf hello-interval {{ port.ospf[1] }}
+  no ip ospf passive-interface
+{# Required to get OSPF area #}
+{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+{% if port.ospf[0] == ospf.pro %}
+{% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area }}
+{% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
+{# adds 1 to the area #}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
+{% endif %}{% endif %}
+{% endfor %}{% endif %}{% endfor %}
+{% endif %}{% endif %}
+  vpc {{ port.vpc }}
+  no shutdown
+!
+{% endif %}
+{% endfor %}
+
+#################### Dual-Homed Interfaces ####################
+{### Create the dual homed interfaces ###}
+{% for port in srv_ports_dm.dh_ports %}
+{# Formula adds 1 to current switch to so created on both switches in VPC pair #}
+{% if (port.switch == inventory_hostname) or (port.switch[:-2] + "%02d" |format(port.switch[-2:] |int+1) == inventory_hostname) %}
+interface {{ port.interface }}
+{# Create the dual homed access port #}
+{% if port.port_type == 'access' %}
+  description Access > {{ port.description }}
+  switchport mode access
+  switchport access vlan {{ port.port_variable }}
+{# Create the dual homed trunk port #}
+{% elif port.port_type == 'trunk' %}
+  description Access > {{ port.description }}
+  switchport mode trunk
+  switchport trunk allowed vlan {{ port.port_variable }}
+{# Create the dual homed layer3 port #}
+{% elif port.port_type == 'layer3' %}
+  description P-t-P > {{ port.description }}
+  no switchport
+  vrf member {{ port.vrf }}
+  ip address {{ port.port_variable }}
+{% if port.ospf is defined and device_name.border_name in port.switch %}
+  ip ospf hello-interval {{ port.ospf[1] }}
+  no ip ospf passive-interface
+{# Required to get OSPF area #}
+{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+{% if port.ospf[0] == ospf.pro %}
+{% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area }}
+{% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
+{# adds 1 to the area #}
+  ip router ospf {{ port.ospf[0] }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
+{% endif %}{% endif %}
+{% endfor %}{% endif %}{% endfor %}
+{% endif %}{% endif %}
+  channel-group {{ port.po }} mode {{ port.po_mode }}
+  no shutdown
+!
+{% endif %}
+{% endfor %}
+
+{################################################# Service: Routing Protocols (border only)  #################################################}
+{% if device_name.border_name in inventory_hostname %}
+{### Create all the Prefix-lists ###}
+ip prefix-list ALLOW-ANY seq 5 permit 0.0.0.0/0 le 32
+ip prefix-list DEFAULT seq 5 permit 0.0.0.0/0
+ip prefix-list DENY-ALL seq 5 permit 0.0.0.0/0 le 32
+!
+{# Create the eBGP peerings prefix-lists #}
+{% for vrf in srv_routing %}
+{# Stops it failing if bgp_peerings not defined in all VRFs #}
+{% if vrf.bgp.bgp_peerings != none %}
+{% for peer in vrf.bgp.bgp_peerings %}
+{# The start sequence number that has 5 added to it with each loop iteration #}
+{% set seq = namespace(pfx=5) %}
+{% if peer.allowed_in |length  > 1 %}
+{% for pfx in peer.allowed_in %}
+ip prefix-list {{ srv_routing_adv.bgp.pl_in_naming | replace("name",peer.name) }} seq {{ seq.pfx }} permit {{ pfx }}
+{% set seq.pfx = seq.pfx + 5 %}
+{% endfor %}
+{% endif %}
+{% set seq = namespace(pfx=5) %}
+{% if peer.allowed_out |length  > 1 %}
+{% for pfx in peer.allowed_out %}
+ip prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }} seq {{ seq.pfx }} permit {{ pfx }}
+{% set seq.pfx = seq.pfx + 5 %}
+{% endfor %}{% endif %}{% endfor %}{% endif %}
+{# Stops it failing if bgp_peerings not defined in all VRFs #}
+{% if vrf.bgp.inet_peerings != none %}
+{# Create the INET peerings prefix-lists #}
+{% for peer in vrf.bgp.inet_peerings %}
+{% set seq = namespace(pfx=5) %}
+{% if peer.allowed_out |length  > 1 %}
+{% for pfx in peer.allowed_out %}
+ip prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }} seq {{ seq.pfx }} permit {{ pfx }}
+{% set seq.pfx = seq.pfx + 5 %}
+{% endfor %}{% endif %}{% endfor %}{% endif %}
+{# Create the OSPF ExtCommunity-list to match on the RT (BGP:L3VNI) #}
+{# Stops it failing if ospf is not defined in all VRFs #}
+{% if vrf.ospf != none %}
+{% for ospf in vrf.ospf %}
+{% if ospf.bgp_redist_in == true %}
+{% for tn in srv_tenants_dm %}
+{# created based on the vrf names of OSPF process and tennat beign the same #}
+{% if tn.tenant_name == vrf.tenant %}
+{% set ext_comm = srv_routing_adv.ospf.cl_in_naming | replace("vrf",vrf.tenant) %}
+ip extcommunity-list standard {{ ext_comm }} permit rt {{ fbc.bgp.as_num }}:{{ srv_tenants_adv.bgp.ipv4_redist_tag |default(tn.l3vni) }}
+{% endif %}{% endfor %}{% endif %}{% endfor %}{% endif %}{% endfor %}
+!
+{### Create all the Route-maps ###}
+{# Create the eBGP peerings Route-maps #}
+{% for vrf in srv_routing %}{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
+route-map {{ srv_routing_adv.bgp.rm_in_naming | replace("name",peer.name) }} permit 10
+{% if peer.allowed_in |length  == 1 %}
+ match ip address prefix-list {{ peer.allowed_in[0] }}
+{% else %}
+ match ip address prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }}
+{% endif %}
+route-map {{ srv_routing_adv.bgp.rm_out_naming | replace("name",peer.name) }} permit 10
+{% if peer.allowed_out |length  == 1 %}
+ match ip address prefix-list {{ peer.allowed_out[0] }}
+{% else %}
+ match ip address prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }}
+{% endif %}{% endfor %}{% endif %}{% endfor %}
+{# Create the INET peerings Route-maps #}
+route-map rm_INET_IN permit 10
+ match ip address prefix-list DEFAULT
+{% for vrf in srv_routing %}{% if vrf.bgp.inet_peerings != none %}{% for peer in vrf.bgp.inet_peerings %}
+route-map {{ srv_routing_adv.bgp.rm_out_naming | replace("name",peer.name) }} permit 10
+{% if peer.allowed_out |length  == 1 %}
+ match ip address prefix-list {{ peer.allowed_out[0] }}
+{% else %}
+ match ip address prefix-list {{ srv_routing_adv.bgp.pl_out_naming | replace("name",peer.name) }}
+{% endif %}{% endfor %}{% endif %}
+{# Create the OSPF Route-maps #}
+{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+{% if ospf.bgp_redist_in == true %}
+route-map {{ srv_routing_adv.ospf.rm_in_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
+ match extcommunity {{ srv_routing_adv.ospf.cl_in_naming | replace("vrf",vrf.tenant) }}
+{% endif %}
+{% if ospf.bgp_redist_out |length == 1 %}
+route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
+ match ip address prefix-list {{ ospf.bgp_redist_out[0] }}
+{% elif ospf.bgp_redist_out |length > 1 %}
+route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }} permit 10
+ match ip address prefix-list {{ srv_routing_adv.ospf.pl_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
+{% endif %}{% endfor %}{% endif %}{% endfor %}
+!
+##################### OSPF Process config #####################
+{### Create the OSPF configurations ###}
+{# Create VLAN and SVI for inter border OSPF peering #}
+{# Starting value to increment IP address subent range by #}
+{% set ip_incr = namespace(val=0) %}
+{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+vlan {{ ospf.inter_sw_vlan }}
+  name OSPF{{ ospf.pro }}_nbr_border
+!
+interface vlan{{ ospf.inter_sw_vlan }}
+  description {{vrf.tenant}} OSPF {{ ospf.pro }} peering to neighbor border
+  no shutdown
+  vrf member {{ vrf.tenant }}
+   no ip redirects
+{# Creates IP address based on switch number, i.e border1 is .41, etc #}
+   ip address {{ addressing.srv_ospf_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+ip_incr.val) }}/31
+{# Increments base IP rqnage by 4 for next OSPF process, so border 1 would be 45 #}
+{% set ip_incr.val = ip_incr.val + 4 %}
+   no ipv6 redirects
+   no ip ospf passive-interface
+{% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
+   ip router ospf {{ ospf.pro }} area {{ ospf.area }}
+{% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
+{# adds 1 to the area #}
+  ip router ospf {{ ospf.pro }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
+{% endif %}{% endfor %}{% endif %}{% endfor %}
+!
+{# Creates the OSPF process #}
+{% set ip_incr = namespace(val=0) %}
+{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+router ospf {{ ospf.pro }}
+{% if ospf.default_orig == false %}
+  default-information originate
+{% elif ospf.default_orig == 'always' %}
+  default-information originate always
+{% endif %}
+  vrf {{ vrf.tenant }}
+    router-id {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+ip_incr.val) }}
+{% set ip_incr.val = ip_incr.val + 4 %}
+{% if ospf.bgp_redist_in == true %}
+    redistribute bgp {{ fbc.bgp.as_num }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
+{% endif %}
+    passive-interface default
+{% endfor %}{% endif %}{% endfor %}
+!
+{### Create the BGP configurations ###}
+##################### BGP Configuration #####################
+router {{ fbc.bgp.as_num }}
+{# Create BGP templates and vrf addr family #}
+  template peer INET_PEERING
+    timers 10 30
+    address-family ipv4 unicast
+      send-community
+      send-community extended
+      route-map rm_INET_IN in
+      soft-reconfiguration inbound
+{% for vrf in srv_routing %}{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
+  template {{ peer.name }}_PEERING
+    remote-as {{ peer.remote_as }}
+    timers {{ peer.timers |default("3 9") }}
+    address-family ipv4 unicast
+      send-community
+      send-community extended
+      route-map {{ srv_routing_adv.bgp.rm_in_naming | replace("name",peer.name) }} in
+      route-map {{ srv_routing_adv.bgp.rm_out_naming | replace("name",peer.name) }} out
+      soft-reconfiguration inbound
+{% endfor %}{% endif %}{% endfor %}
+{# Within the VRF associate the BGP templates to the peers and redist OSPF #}
+{% for vrf in srv_routing %}
+  vrf {{ vrf.tenant }}
+    bestpath as-path multipath-relax
+    address-family ipv4 unicast
+{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
+{% if ospf.bgp_redist_out |length > 0 %}
+      redistribute ospf {{ ospf.pro }} route-map {{ srv_routing_adv.ospf.rm_out_naming | replace("pro",ospf.pro) | replace("as",fbc.bgp.as_num) }}
+{% endif %}{% endfor %}{% endif %}
+      maximum-paths 2
+{% if vrf.bgp.bgp_peerings != none %}{% for peer in vrf.bgp.bgp_peerings %}
+    neighbor {{ peer.peer_ip }}
+      inherit peer {{ peer.name }}_PEERING
+      description {{ peer.description }}
+{% endfor %}{% endif %}
+{% if vrf.bgp.inet_peerings != none %}{% for peer in vrf.bgp.inet_peerings %}
+    neighbor {{ peer.peer_ip }}
+      inherit peer INET_PEERING
+      remote-as {{ peer.remote_as }}
+      description {{ peer.description }}
+{% if peer.timers is defined %}
+    timers {{ peer.timers }}
+{% endif %}
+    address-family ipv4 unicast
+      route-map {{ srv_routing_adv.bgp.rm_out_naming | replace("name",peer.name) }} out
+{% endfor %}{% endif %}
+
+{% endfor %}
+{% endif %}
