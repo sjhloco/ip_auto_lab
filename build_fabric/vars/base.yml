@@ -17,7 +17,7 @@ bse:
 
   users:
     - username: admin
-      password: $5$zuqcgFp4$62a5Mbxu1uFu7Udszc9boXrR9knz.Rhqbi.xstWTud/
+      password: $5$zuqcgFp4$62a5Mbxu1uFu7Udszc9boXrR9knz.Rhqbi.xstWTud/     # Passowrds must be entered encrypted in
       role: network-admin
 
   # Details for all the services that the switches consume
@@ -54,13 +54,15 @@ bse:
       port: [udp, 161]
     ssh:
       name: SSH_ACCESS
-      source: [10.10.10.0/24, 10.255.254.0/24]
+      source: [10.10.10.0/24, 10.255.254.0/24, 10.10.108.0/24, 192.168.255.0/24]
       port: [tcp, 22]
 
   # Advanced base configuration that is less likely to be changed
   adv:
-    acast_gw_mac: 0000.2222.3333
-    image: nxos.7.0.3.I7.6.bin
+    image: nxos.9.2.4.bin
     exec_timeout:
       console: 0
       vty: 15
+
+
+

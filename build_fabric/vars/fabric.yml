@@ -1,9 +1,4 @@
 ---
-
-
-
-
-
 ################ Variables used to decide how the fabric will look ################
 # This Only scales to 4 spines, 10 leafs, 4 borders. By default the following ports are used:
 # SPINE-to-LEAF = Eth1/1 - 1/10           SPINE-to-Border = Eth1/11 - 1/15
@@ -25,13 +20,16 @@ fbc:
     bgp:
       as_num: 65001
 
+  acast_gw_mac: 0000.2222.3333
 ################ Advanced settings to further customize the fabric ################
 
   adv:
     # To change the interfaces used to create the farbic. These are the first interfaces used, the playbook increments these
     bse_intf:
       intf_fmt: Ethernet1/            # Switch interface, must be same on all switches. First 3 letters used in interface descriptions
+      intf_short: Eth1/                # USed in descritions of interfaces
       ec_fmt: Port-channel
+      ec_short: Po
       sp_to_lf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
       sp_to_bdr: 11                     # First interface used for SPINE to BORDER links (1 to 4)
       lf_to_sp: 1                        # First interface used LEAF to SPINE links (1 to 4)
@@ -64,5 +62,3 @@ fbc:
       border_bgw_lp: 58                       # Pair of BORDER BGW loopback addresses will be from .58 to .59
       mlag_leaf_ip: 1                          # Start IP for LEAF Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
       mlag_border_ip: 11                       # Start IP for BORDER Peer Links, so BORDER1 is .11, BORDER2 .12, etc
-
-      

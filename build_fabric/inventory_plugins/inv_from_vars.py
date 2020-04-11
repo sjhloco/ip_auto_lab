@@ -2,7 +2,7 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 # ============================== Documentation ============================
-# options match get_options and are actually configuration (i.e. type, required, default)
+# options match get_options (in section that parses) and are actually the configuration (i.e. type, required, default)
 
 DOCUMENTATION = '''
     name: inv_from_vars
@@ -29,7 +29,7 @@ DOCUMENTATION = '''
             type: list
 
 '''
-# What users see as away of instructions on how to run the plugin
+# What users see as a way of instructions on how to run the plugin
 EXAMPLES = '''
 # inv_from_vars_cfg.yml file in YAML format
 # Example command line: ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -v --list -i inv_from_vars_cfg.yml
@@ -46,15 +46,14 @@ var_dicts:
   ansible:
     - device_type                       # Device type (os) for each switch type (group)
   base:
-    - device_name                   # Naming format for each host
-    - addr                    # Address ranges the devices IPs are created from. Loopback must be /32
-
+    - device_name                       # Naming format for each host
+    - addr                              # Address ranges the devices IPs are created from. Loopback must be /32
   fabric:
-    - network_size                  # Dictates number of inventory objects created for each device role
-    - bse_intf                   # Naming and increments for the fabric interfaces
-    - lp                            # Loopback interfaces
-    - mlag                      # mlag settings
-    - addr_incre             # Network address increment used for each device role (group)
+    - network_size                      # Dictates number of inventory objects created for each device role
+    - bse_intf                          # Naming and increments for the fabric interfaces
+    - lp                                # Loopback interface naming and descriptions
+    - mlag                              # Holds the peer link Port-Channel number
+    - addr_incre                        # Network address increment used for each device role (group)
 '''
 
 # ==================================== Plugin ==================================
@@ -63,7 +62,6 @@ import os
 import yaml
 from ipaddress import ip_network
 from collections import defaultdict
-from pprint import pprint
 # Ansible modules required for the features of the inventory plugin
 from ansible.errors import AnsibleParserError
 from ansible.module_utils._text import to_native, to_text
@@ -71,10 +69,10 @@ from ansible.plugins.inventory import BaseInventoryPlugin, Constructable, Cachea
 
 # Ansible Inventory plugin class that holds pre-built methods that run automatically (verify_file, parse) without needing to be called
 class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
-    NAME = 'inv_from_vars'     # Should match name of the plugin
+    NAME = 'inv_from_vars'                  # Should match name of the plugin
 
-# ==================================== Verify config file ==================================
-    # 1. Makes a quick determination whether the inventory source config file is usable by the plugin
+# ==================================== 1. Verify config file ==================================
+# 1. Makes a quick determination whether the inventory source config file is usable by the plugin
     def verify_file(self, path):
         valid = False
         if super(InventoryModule, self).verify_file(path):
@@ -82,154 +80,130 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 valid = True
         return valid
 
-# ============================ Generates host details from data models ==========================
-    #3. Generates the hostname and IP addresses to be used to create the inventory using data model from config file
-    def create_objects(self):
-        self.spine, self.border, self.leaf, self.mgmt_ip, self.rtr_lp, self.vtep_lp, self.mlag_lp, self.bgw_lp = ([] for i in range(8))
+# ============================ 3. Generate all the device specific IP interface addresses  ==========================
+# #3. Generates the hostname and IP addresses to be used to create the inventory using data model from config file
+    def create_ip(self):
+        self.all_lp, self.all_mgmt, self.mlag_peer = ({} for i in range(3))
+        self.spine, self.border, self.leaf = ([] for i in range(3))
 
-        ##### !!!! NEED to RENAME
-        # Used in create_inventory to set the element on which to start loop so skips spine and/or border loopback addresses
-        self.skip_sp = self.network_size['num_spines']
-        self.skip_lf = self.network_size['num_leafs']
-        self.skip_bdr = self.network_size['num_borders']
-        self.skip_sp_lf = self.network_size['num_spines'] + self.network_size['num_leafs']
+        # Create new network size variabels as will be decreasing the value
+        num_sp = self.network_size['num_spines']
+        num_lf = self.network_size['num_leafs']
+        num_bdr = self.network_size['num_borders']
 
-        # Halfs the the number of border and leaf switches which is used to create the MLAG loopback IP
-        half_num_borders = self.network_size['num_borders'] /2
-        half_num_leafs = self.network_size['num_leafs'] /2
+        # 3a. SPINE: Generates name, management and Loopback IP (rtr) and adds to self.all_x dictionaries (spine_name is the key)
+        incr_num = 0
+        while num_sp != 0:
+            incr_num += 1                    # Increments by 1 for each device
+            # Creates the spine name using the incremented (double-decimal format)
+            self.spine.append(self.device_name['spine'] + str("%02d" % incr_num))
+            # Creates the mgmt IP by adding the num_incr and device_ip_incr to the the network address ({sp_name: mgmt_ip})
+            self.all_mgmt[self.spine[incr_num -1]] = str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['spine_ip'] + incr_num -1])
+            # Creates the RTR loopback by adding the num_incr and device_ip_incr to the the network address and then adding subnet and adds to dict
+            rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['spine_ip'] + incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
+            # Creates dict in format sp_name: [{name:lp, ip:lp_ip, descr:lp_descr}) used in next method to create the inventory
+            self.all_lp[self.spine[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]}]
+            num_sp -= 1        # Reduces number of spines each iteration
 
-        # 3a. Generate a lists of Spine switches, the management IPs and Loopback IPs
-        num = 0
-        while self.network_size['num_spines'] != 0:
-            num += 1            # Increments by 1 for each device
-            # Creates the name using the incremented (double-decimal format)
-            self.spine.append(self.device_name['spine'] + str("%02d" % num))
-            # Creates the mgmt IP by adding the num_incr and device_ip_incr to the the network address
-            self.mgmt_ip.append(str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['spine_ip'] + num -1]))
-            # Creates the RTR loopback by adding the num_incr and device_ip_incr to the the network address and then adding subnet
-            self.rtr_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['spine_ip'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.network_size['num_spines'] -= 1        # Reduces number of spines each iteration
+        # 3b. LEAF: Generates name, management, Loopback IPs (rtr, vtep, mlag), mlag peer IP and adds to self.all_x dictionaries (leaf_name is the key)
+        incr_num, odd_incr_num = (0 for i in range(2))
+        while num_lf != 0:
+            incr_num += 1
+            self.leaf.append(self.device_name['leaf'] + str("%02d" % incr_num))
+            # If device_name ends in an odd number makes one MLAG (loopback secondary) IP as is shared between a VPC pair
+            if int(self.leaf[incr_num -1][-2:]) % 2 != 0:
+                odd_incr_num += 1
+                mlag_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_mlag_lp'] + odd_incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
+            self.all_mgmt[self.leaf[incr_num -1]] = str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['leaf_ip'] + incr_num -1])
+            rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_ip'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
+            vtep_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_vtep_lp'] + incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
+            self.all_lp[self.leaf[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]},
+                                                   {'name': list(self.lp['vtep'].keys())[0], 'ip': vtep_ip, 'descr': list(self.lp['vtep'].values())[0],
+                                                   'mlag_lp_addr': mlag_ip}]
+            # Generates MLAG peer IP and adds to dictionary
+            self.mlag_peer[self.leaf[incr_num -1]] = str(ip_network(self.addr['mlag_net'], strict=False)[int(self.leaf[incr_num -1][-2:]) +
+                                                                    self.addr_incre['mlag_leaf_ip'] -1]) + '/31'
+            num_lf -= 1
 
-        # 3b. Generate a lists of leaf switches and adds management IPs and Loopback IPs to existing list
-        num = 0
-        while self.network_size['num_leafs'] != 0:
-            num += 1
-            self.leaf.append(self.device_name['leaf'] + str("%02d" % num))
-            self.mgmt_ip.append(str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['leaf_ip'] + num -1]))
-            self.rtr_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_ip'] + num - 1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.vtep_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_vtep_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.network_size['num_leafs'] -= 1
-
-       # 3c. Generate a lists of border switches and adds management IPs and Loopback IPs to existing list as well as neew vist for VTEPs
-        num = 0
-        while self.network_size['num_borders'] != 0:
-            num += 1
-            self.border.append(self.device_name['border'] + str("%02d" % num))
-            self.mgmt_ip.append(str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['border_ip'] + num -1]))
-            self.rtr_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_ip'] + num - 1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.vtep_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_vtep_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.network_size['num_borders'] -= 1
-
-    #     # 3d. Generate a list of MLAG loopbacks to be used by each border and leaf MLAG pair and BGW loopback only on borders
-        num = 0
-        while half_num_leafs != 0:
-            num += 1
-            # Adds the generated IP address for MLAG loopback twice as same IP used by both devices in MLAG pair
-            self.mlag_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_mlag_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.mlag_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_mlag_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            half_num_leafs-= 1
-        num = 0
-        while half_num_borders != 0:
-            num += 1
-            self.mlag_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_mlag_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.mlag_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_mlag_lp'] + num -1)+ '/' + self.addr['lp_net'].split('/')[1])
-            # Adds the generated IP address for the BGW loopback twice as same IP used by both devices in MLAG pair
-            self.bgw_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_bgw_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            self.bgw_lp.append(str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_bgw_lp'] + num -1) + '/' + self.addr['lp_net'].split('/')[1])
-            half_num_borders -= 1
-
-
-        # Create MLAG interface IP address
-        self.mlag_peer = {}
-        for dev in self.leaf + self.border:
-            if self.device_name['leaf'] in dev:
-                self.mlag_peer[dev] = str(ip_network(self.addr['mlag_net'], strict=False)[int(dev[-2:]) + self.addr_incre['mlag_leaf_ip'] -1]) + '/31'
-            else:
-                self.mlag_peer[dev] = str(ip_network(self.addr['mlag_net'], strict=False)[int(dev[-2:]) + self.addr_incre['mlag_border_ip'] -1]) + '/31'
+       # 3c. BORDER: Generates name, management and Loopback IPs (rtr, vtep, mlag, bgw) and adds to self.all_x dictionaries (border_name is the key)
+        incr_num, odd_incr_num = (0 for i in range(2))
+        while num_bdr != 0:
+            incr_num += 1
+            self.border.append(self.device_name['border'] + str("%02d" % incr_num))
+            if int(self.border[incr_num -1][-2:]) % 2 != 0:
+                odd_incr_num += 1
+                mlag_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_mlag_lp'] + odd_incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
+                bgw_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_bgw_lp'] + odd_incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
+            self.all_mgmt[self.border[incr_num -1]] = str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['border_ip'] + incr_num -1])
+            rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_ip'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
+            vtep_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_vtep_lp'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
+            self.all_lp[self.border[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]},
+                                                {'name': list(self.lp['vtep'].keys())[0], 'ip': vtep_ip, 'descr': list(self.lp['vtep'].values())[0],
+                                                'mlag_lp_addr': mlag_ip},
+                                                {'name': list(self.lp['bgw'].keys())[0], 'ip': bgw_ip, 'descr': list(self.lp['bgw'].values())[0]}]
+            self.mlag_peer[self.border[incr_num -1]] = str(ip_network(self.addr['mlag_net'], strict=False)[int(self.border[incr_num -1][-2:]) +
+                                                                      self.addr_incre['mlag_border_ip'] -1]) + '/31'
+            num_bdr -= 1
 
 
-    def create_interfaces(self):
-        # 4. For the underlay uplinks creates nested dicts with key the device_name and value being another dictionary of {interface:description}
-        self.all_int = defaultdict(dict)
-        self.mlag_int = defaultdict(dict)
+# ============================ 4. Generate all the fabric interfaces  ==========================
+# 4. For the uplinks (doesnt include iPs) creates nested dicts with key the device_name and value a dict {sp_name: {intf_num: descr}, {intf_num: descr}}
+    def create_intf(self):
+        self.all_int, self.mlag_int, mlag_ports = (defaultdict(dict) for i in range(3))
 
-        # 4a. Create nested dictionary for spine interfaces
+        # 4a. SPINE: Create nested dictionary of the devices fabric interfaces based on number of leaf and border switches
         for sp in self.spine:
-            for lf_num in range(self.skip_lf):
-                # Description uses loop increment to get remote device number and spine name and interface increment to get remote device port
-                descr = 'UPLINK > ' + self.device_name['leaf'] + "{:02d} ".format(lf_num +1) + self.bse_intf['intf_fmt'][:3] + self.bse_intf['intf_fmt'][-2:] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['lf_to_sp'] -1)
+            for lf_num in range(self.network_size['num_leafs']):
+                # Loops through the number of leafs using the increment to create the remote device name
+                dev_name = 'UPLINK > ' + self.device_name['leaf'] + "{:02d} ".format(lf_num +1)
+                # Creates remote device port using spine number and the leaf_to_spine interfcae increment
+                dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['lf_to_sp'] -1)
                 # Interface number got from the starting interface increment (sp_to_lf) and the loop interation (lf_num)
-                self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_lf'] + lf_num))] = descr
-            for lf_num in range(self.skip_bdr):
-                descr = 'UPLINK > ' + self.device_name['border'] + "{:02d} ".format(lf_num +1) + self.bse_intf['intf_fmt'][:3] + self.bse_intf['intf_fmt'][-2:] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['bdr_to_sp'] -1)
-                self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_bdr'] + lf_num))] = descr
+                self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_lf'] + lf_num))] = dev_name + dev_int
+            for bdr_num in range(self.network_size['num_borders']):
+                dev_name = 'UPLINK > ' + self.device_name['border'] + "{:02d} ".format(bdr_num +1)
+                dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['bdr_to_sp'] -1)
+                self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_bdr'] + bdr_num))] = dev_name + dev_int
 
-        # 4b. Create nested dictionary for leaf interfaces
+        # 4b. LEAF: Create nested dictionary of the devices fabric interfaces based on the number of spine switches
         for lf in self.leaf:
-            for sp_num in range(self.skip_sp):
-                descr = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1) + self.bse_intf['intf_fmt'][:3] + self.bse_intf['intf_fmt'][-2:] + "{:01d}".format(int(lf[-2:]) + self.bse_intf['sp_to_lf'] -1)
-                self.all_int[lf][self.bse_intf['intf_fmt'] + (str(self.bse_intf['lf_to_sp'] + sp_num))] = descr
+            for sp_num in range(self.network_size['num_spines']):
+                dev_name = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1)
+                dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(lf[-2:]) + self.bse_intf['sp_to_lf'] -1)
+                self.all_int[lf][self.bse_intf['intf_fmt'] + (str(self.bse_intf['lf_to_sp'] + sp_num))] = dev_name + dev_int
 
-        # 4c. Create nested dictionary for border interfaces
+        # 4c. BORDER: Create nested dictionary of the devices fabric interfaces based on the number of spine switches
         for bdr in self.border:
-            for sp_num in range(self.skip_sp):
-                descr = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1) + self.bse_intf['intf_fmt'][:3] + self.bse_intf['intf_fmt'][-2:] + "{:01d}".format(int(bdr[-2:]) + self.bse_intf['sp_to_bdr'] -1)
-                self.all_int[bdr][self.bse_intf['intf_fmt'] + (str(self.bse_intf['bdr_to_sp'] + sp_num))] = descr
+            for sp_num in range(self.network_size['num_spines']):
+                dev_name = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1)
+                dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(bdr[-2:]) + self.bse_intf['sp_to_bdr'] -1)
+                self.all_int[bdr][self.bse_intf['intf_fmt'] + (str(self.bse_intf['bdr_to_sp'] + sp_num))] = dev_name + dev_int
 
-        # 4d. Create nested dictionary for border and leaf MLAG interfaces
-        mlag_ports = [self.bse_intf['intf_fmt'] + self.bse_intf['mlag_peer'].split('-')[0], self.bse_intf['intf_fmt'] +
-                      self.bse_intf['mlag_peer'].split('-')[1], self.bse_intf['ec_fmt'] + str(self.mlag['peer_po'])]
+        # 4d. BORDER, LEAF: Create nested dictionary for border and leaf MLAG interfaces
+        # Create a list of dictionaries of all MLAG ports and their short names for the description [{int_name: short_int_name}]
+        for intf_num in self.bse_intf['mlag_peer'].split('-'):
+            mlag_ports[self.bse_intf['intf_fmt'] + intf_num] = self.bse_intf['intf_short'] + intf_num
+        mlag_ports[self.bse_intf['ec_fmt'] + str(self.mlag['peer_po'])] = self.bse_intf['ec_short'] + str(self.mlag['peer_po'])
+
         for dev in self.leaf + self.border:
-            for port in mlag_ports:
-                if self.bse_intf['intf_fmt'] in port:
-                    if int(dev[-2:]) % 2 != 0:        # If device_name ends in an odd number
-                        self.mlag_int[dev][port] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) +1) + port[:3] + port[len(self.bse_intf['intf_fmt']) -2:]
-                    else:                           # If device_name ends in an even number
-                        self.mlag_int[dev][port] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) -1) + port[:3] + port[len(self.bse_intf['intf_fmt']) -2:]
-                else:           # Different description for port-channel
-                    if int(dev[-2:]) % 2 != 0:
-                        self.mlag_int[dev][port] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) +1) + port[:2] + str(self.mlag['peer_po'])
-                    else:
-                        self.mlag_int[dev][port] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) -1) + port[:2] + str(self.mlag['peer_po'])
+            for intf, intf_short in mlag_ports.items():
+                # If device_name ends in an odd number increment the device_name by 1
+                if int(dev[-2:]) % 2 != 0:
+                    self.mlag_int[dev][intf] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) +1) + intf_short
+                # If device_name ends in an even number decreases the device_name by 1
+                else:                           # If device_name ends in an even number
+                    self.mlag_int[dev][intf] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) -1) + intf_short
 
 
-# {# For border devices using peer_incre creates /31 peer-link IPs based in hostname number #}
-# {% if device_name.border_name in inventory_hostname %}
-#   ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+address_incre.vpc_border_ip) }}/31
-# {# For leaf devices using peer_incre creates /31 peer-link IPs based in hostname number #}
-# {% elif device_name.leaf_name in inventory_hostname %}
-#   ip address {{ addressing.vpc_peer_subnet |ipaddr('network') |ipmath(inventory_hostname[-2:]|int+address_incre.vpc_leaf_ip) }}/31
-
-
-
-
-
-        # for x in self.all_int:
-        #     print(x)
-        # pprint(self.all_int)
-
-
-
-
-# ============================ Create the inventory ==========================
-# 4. Adds groups, hosts and variables to create the inventory file
+# ============================ 5. Create the inventory ==========================
+# 5. Adds groups, hosts and host_vars to create the inventory file
     def create_inventory(self):
         # Creates list of groups created from the device names
         groups = [self.device_name['spine'].split('-')[-1].lower(), self.device_name['border'].split('-')[-1].lower(),
                   self.device_name['leaf'].split('-')[-1].lower()]
 
+        #5a. Creates all the group, they are automatically added to the 'all' group
         for gr in groups:
-            # Creates all the group, they are automatically added to the 'all' group
             self.inventory.add_group(gr)
             # Creates the host entries, os and mlag_lp_addr host_var (although assigned to group in the cmd)
             if gr == 'spine':
@@ -246,82 +220,69 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                     self.inventory.add_host(lf, gr)
                     self.inventory.set_variable(gr, 'os', self.device_type['leaf_os'])
 
-        # Adds the mgmt as host_vars for all devices by using zip to iterate through 3 lists simultaneously
-        for host, mgmt, rtr_lp in zip((self.spine + self.leaf + self.border), self.mgmt_ip, self.rtr_lp):
-            self.inventory.set_variable(host, 'ansible_host', mgmt)
+        #5b. Adds host_vars for all the IP dictionaries created in 'create_ip' method
+        for host, mgmt_ip in self.all_mgmt.items():
+            self.inventory.set_variable(host, 'ansible_host', mgmt_ip)
+        for host, lp in self.all_lp.items():
+            self.inventory.set_variable(host, 'intf_lp', lp)
+        for host, mlag_peer in self.mlag_peer.items():
+            self.inventory.set_variable(host, 'mlag_peer_ip', mlag_peer)
 
-        # SPINE: Adds RTR loopback address in nested dictionary called lp
-        for host, rtr_lp in zip(self.spine, self.rtr_lp):
-            self.inventory.set_variable(host, 'intf_lp', {list(self.lp['rtr'].keys())[0]: {rtr_lp: list(self.lp['rtr'].values())[0]}})
-
-        # LEAF: Adds the RTR, VTEP and MLAG loopback address (secondary IP) to lp nested host_var on leafss. Loop index starts past spine lps
-        for host, rtr_lp, vtep_lp, mlag_lp, in zip(self.leaf, self.rtr_lp[self.skip_sp:], self.vtep_lp, self.mlag_lp):
-            self.inventory.set_variable(host, 'intf_lp', {list(self.lp['rtr'].keys())[0]: {rtr_lp: list(self.lp['rtr'].values())[0]},
-                                                     list(self.lp['vtep'].keys())[0]: {vtep_lp: list(self.lp['vtep'].values())[0],
-                                                                                       'mlag_lp_addr': mlag_lp}})
-
-        # BORDER: Adds the RTR, VTEP, MLAG, BGW loopback address (secondary IP) to lp nested host_var on borders. Loop index starts past spine and leaf lps
-        for host, rtr_lp, vtep_lp, mlag_lp, bgw_lp in zip(self.border , self.rtr_lp[self.skip_sp_lf:], self.vtep_lp[self.skip_lf:], self.mlag_lp[self.skip_lf:], self.bgw_lp):
-            self.inventory.set_variable(host, 'intf_lp', {list(self.lp['rtr'].keys())[0]: {rtr_lp: list(self.lp['rtr'].values())[0]},
-                                                     list(self.lp['vtep'].keys())[0]: {vtep_lp: list(self.lp['vtep'].values())[0],
-                                                                                       'mlag_lp_addr': mlag_lp},
-                                                     list(self.lp['bgw'].keys())[0]: {bgw_lp: list(self.lp['bgw'].values())[0]}})
-
-        # Adds the fabric interfaces
+        #5c. Adds host_vars for all the Interface dictionaries created in 'create_intf' method
         for host, int_details in self.all_int.items():
             self.inventory.set_variable(host, 'intf_fbc', int_details)
-
-        # Adds the MLAG interfaces
         for host, int_details in self.mlag_int.items():
             self.inventory.set_variable(host, 'intf_mlag', int_details)
 
-       # Adds the MLAG Peer IP
-        for host, int_details in self.mlag_peer.items():
-            self.inventory.set_variable(host, 'mlag_peer_ip', int_details)
 
-# ============================ Parse data from config file ==========================
+# ============================ 2. Parse data from config file ==========================
 # !!!! The parse method is always auto-run, so is what starts the plugin and runs any custom methods !!!!
 
-    # 2. This Ansible pre-defined method pulls the data from the config file and creates variables for it.
+# 2. This Ansible pre-defined method pulls the data from the config file and creates variables for it.
     def parse(self, inventory, loader, path, cache=False):
         # `Inherited methods: inventory creates inv, loader loads vars from cfg file and path is path to cfg file
         super(InventoryModule, self).parse(inventory, loader, path)
 
-        # 2a. Read the data from the config file and create variables. !!! The options MUST be defined in documentation options section !!!
+        # 2a. Read the data from the config file and create variables. !!! The options MUST be defined in DOCUMENTATION options section !!!
         self._read_config_data(path)
         var_files = self.get_option('var_files')           # List of the Ansible varaible files (in vars)
         var_dicts = self.get_option('var_dicts')           # Names of the dictionaries that will be got from these files
 
-        # 2b. Loads the yaml file to makes a dictionary of dictionaires holding contents of all files in format file_name:file_contents
+        # 2b. Loads the yaml file to makes a dictionary of dictionaires holding contents of all files in format {file_name:file_contents}
         all_vars = {}
         mydir = os.getcwd()                 # Gets current directory
         for dict_name, file_name in zip(var_dicts.keys(), var_files):
             with open(os.path.join(mydir, 'vars/') + file_name, 'r') as file_content:
                 all_vars[dict_name] = yaml.load(file_content, Loader=yaml.FullLoader)
 
-        # 2c. Create new variables of only those needed from the dict of all variables created from yaml files in last step (all_vars)
+        # 2c. Create new variables of only those needed from the dict created in the last step (all_vars)
         # As it loops through list in cfg file is easy to add more variables in the future
         for file_name, var_names in var_dicts.items():
             for each_var in var_names:
-                if each_var == 'device_name':
-                    self.device_name = all_vars[file_name]['bse'][each_var]
-                elif each_var == 'device_type':
+                if each_var == 'device_type':
                     self.device_type = all_vars[file_name]['ans'][each_var]
-                elif each_var == 'addr_incre':
-                    self.addr_incre = all_vars[file_name]['fbc']['adv'][each_var]
+                elif each_var == 'device_name':
+                    self.device_name = all_vars[file_name]['bse'][each_var]
                 elif each_var == 'addr':
                     self.addr = all_vars[file_name]['bse'][each_var]
                 elif each_var == 'network_size':
                     self.network_size = all_vars[file_name]['fbc'][each_var]
-                elif each_var == 'lp':
-                    self.lp = all_vars[file_name]['fbc']['adv'][each_var]
                 elif each_var == 'bse_intf':
                     self.bse_intf = all_vars[file_name]['fbc']['adv'][each_var]
+                elif each_var == 'lp':
+                    self.lp = all_vars[file_name]['fbc']['adv'][each_var]
                 elif each_var == 'mlag':
                     self.mlag = all_vars[file_name]['fbc']['adv'][each_var]
-        self.create_objects()           # Run the method to turn the data model into inventory objects
-        self.create_interfaces()
-        self.create_inventory()         # Run the method to to create the inventory
+                elif each_var == 'addr_incre':
+                    self.addr_incre = all_vars[file_name]['fbc']['adv'][each_var]
+
+        # 3. Creates a data model of the hostnames and device specific IP interface addresses
+        self.create_ip()
+        # 4. Creates a data model of all the fabric interfaces
+        self.create_intf()
+        # 5. Uses  the data models to create the inventory containing groups, hosts and host_vars
+        self.create_inventory()
+
    # Example ways to test variable format is correct before running other methods
         # test = self.addr['lp_net']
         # test = config.get('device_name')[0]['spine']
@@ -332,6 +293,3 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         #     cause_an_exception()
         # except Exception as e:
         #     raise AnsibleError('Something happened, this was original exception: %s' % to_native(e))
-
-
-

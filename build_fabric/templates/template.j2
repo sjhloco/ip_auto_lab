@@ -1,5 +1,8 @@
-{% set rtr_lp = fbc.adv.lp.rtr.keys() |list | first %}
-{% set server_ip = groups['leaf'] + groups['border'] %}
-{% for lf in groups['leaf'] + groups['border'] %}
-{{ lf }}
-{% endfor %}
+feature lldp
+feature bfd
+clock timezone GMT 0 0
+clock summer-time BST 5 sun mar 02:00 5 sun oct 02:00 60
+feature nv overlay
+{# Username and authetication based settings #}
+no password strength-check
+

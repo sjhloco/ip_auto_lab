@@ -7,7 +7,7 @@ ansible_python_interpreter: "/usr/bin/env python"           # Ubuntu
 
 ans:
   # Base directory Location to store the generated configuration snippets
-  dir_path: ~/device_configs1
+  dir_path: ~/device_configs
 
   # Connection Variables
   creds_all:                            # Napalm

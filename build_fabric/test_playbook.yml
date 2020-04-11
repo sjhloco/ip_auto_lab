@@ -16,7 +16,7 @@
   tasks:
   - name: "SYS >> Create config snippets"
     template:
-      src: template.j2
+      src: fabric_template.j2
       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
     tags: tmp
   - name: "SYS >> Print to screen"

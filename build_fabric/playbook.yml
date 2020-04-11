@@ -19,7 +19,7 @@
     tags: dir
 
 # 2. Create the base config snippets using basetemplate.j2
-- name: "SYS >> Create base config snippets"
+- name: "Create base config snippets"
   hosts: all
   connection: local
   vars_files:
@@ -33,7 +33,7 @@
     tags: base
 
 # 3. Create the fabric config snippets using fabric_template.j2
-- name: "SYS >> Create fabric config snippets"
+- name: "Create fabric config snippets"
   hosts: all
   connection: local
   vars_files:
@@ -47,29 +47,48 @@
       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
     tags: fabric
 
-# 4. Create the service config snippets using service_template.j2
-- name: "SYS >> Create services config snippets"
+- name: "Get facts"
   hosts: all
-  connection: local
-  vars_files:
-    - vars/ansible.yml
-    - vars/base.yml
-    - vars/fabric.yml
-    - vars/services.yml
   tasks:
   - block:
-    - name: "SYS >> Use Python to create complete data-model"
-      set_fact:
-        srv_tenants_dm: "{{ srv_tenants |srv_tenants_dm(srv_tenants_adv.base_vni) }}"   # Completes data-model with VNI
-        srv_ports_dm: "{{ srv_ports |srv_ports_dm(srv_ports_adv, srv_tenants) }}"      # Completes data-model with interface & PO/VPC
-      changed_when: false
-      run_once: true
-    - name: "SYS >> Create config snippets"
-      template:
-        src: services_template.j2
-        dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/services.cfg"
-      changed_when: false
-    # - debug:
-    #     var: hostvars
-    tags: services
+    - name: "SYS >> Get facts"
+      napalm_get_facts:
+        provider: "{{ ans.creds_all }}"
+        dev_os: "{{ os }}"
+      register: output
+    - debug: var=output
+    tags: facts
+
+
+
+
+
+
+
+
+# # 4. Create the service config snippets using service_template.j2
+# - name: "SYS >> Create services config snippets"
+#   hosts: all
+#   connection: local
+#   vars_files:
+#     - vars/ansible.yml
+#     - vars/base.yml
+#     - vars/fabric.yml
+#     - vars/services.yml
+#   tasks:
+#   - block:
+#     - name: "SYS >> Use Python to create complete data-model"
+#       set_fact:
+#         srv_tenants_dm: "{{ srv_tenants |srv_tenants_dm(srv_tenants_adv.base_vni) }}"   # Completes data-model with VNI
+#         srv_ports_dm: "{{ srv_ports |srv_ports_dm(srv_ports_adv, srv_tenants) }}"      # Completes data-model with interface & PO/VPC
+#       changed_when: false
+#       run_once: true
+#     - name: "SYS >> Create config snippets"
+#       template:
+#         src: services_template.j2
+#         dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/services.cfg"
+#       changed_when: false
+#     # - debug:
+#     #     var: hostvars
+#     tags: services
 
