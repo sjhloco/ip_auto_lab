@@ -17,6 +17,7 @@ A custom inventory plugin is used to create the dynamic inventory and *host_vars
 Loopbacks are a stored in list of dictionaries so the dict values (ip and intf) can easily be referenced whereas interfaces are a dictionary as they have no IP address so only need to be looped over to create the interfaces.
 
 When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.\
+
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**\
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**\
 **ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**\
@@ -54,14 +55,14 @@ These core elements are the minimun requirements to create the declarative fabri
 
 - *spine_ip: 11*                      Spine mgmt IP and routing loopback addresses will be from .11 to .14
 - *border_ip: 16*                     Border mgmt IP and routing loopback addresses will be from .16 to .19
-- *leaf_ip: 21*                       Leaf mgmt IP and routing loopback addresses will be from .21 to .30
-- *border_vtep_lp: 36*                Border VTEP loopback addresses will be from .36 to .39
-- *eaf_vtep_lp: 41*                   Leaf VTEP loopback addresses will be from .41 to .50
-- *border_mlag_lp: 56*                Pair of border shared loopback addresses (VIP) will be from .56 to .57
-- *leaf_mlag_lp: 51*                  Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
-- *border_bgw_lp: 58*                 Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
-- *mlag_leaf_ip: 1*                   Start IP for Leaf Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
-- *mlag_border_ip: 11*                Start IP for border  Peer Links, so BORDER1 is .11, BORDER2 .12, etc
+- *leaf_ip: 21*                     Leaf mgmt IP and routing loopback addresses will be from .21 to .30
+- *border_vtep_lp: 36*                     Border VTEP loopback addresses will be from .36 to .39
+- *eaf_vtep_lp: 41*                     Leaf VTEP loopback addresses will be from .41 to .50
+- *border_mlag_lp: 56*                     Pair of border shared loopback addresses (VIP) will be from .56 to .57
+- *leaf_mlag_lp: 51*                     Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
+- *border_bgw_lp: 58*                     Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
+- *mlag_leaf_ip: 1*                     Start IP for Leaf Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
+- *mlag_border_ip: 11*                     Start IP for border  Peer Links, so BORDER1 is .11, BORDER2 .12, etc
 
 ## Installation and Prerequisites
 
@@ -101,52 +102,54 @@ NAPALM *commit_changes* is set to *True* so use Ansible *check_mode* to do a dry
 Wihtin the diff folder the config differences for each device are stored in file wiht the devices name.
 Commit changes is always set to true, usee Ansible check mode to deide whetehr do or not
 
-ansible-playbook playbook.yml -l "DC1-N9K-SPINE01" -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
-ansible-playbook playbook.yml -l "DC1-N9K-SPINE01" -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
+```bash
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
+```
 
 ## Caveats
 
-The following caveats cameout of building templates for NXOS config_replace:
-*feature interface-vlan*                              Need to make sure also have *interface vlan1* in your config file
+The following caveats cameout of building templates for NXOS config_replace:\
+*feature interface-vlan*                              Need to make sure also have *interface vlan1* in your config file\
 *logging source-interface loopback1*                  Order specifc so the loopback intefrace must be before it in the template
 
-The following lines to need to be at the top of the config_replace template:
-*!Command: Checkpoint cmd vdc 1*          The nexus wont recognise candidate_config.txt as a checkpoint file without it
+The following lines to need to be at the top of the config_replace template:\
+*!Command: Checkpoint cmd vdc 1*          The nexus wont recognise candidate_config.txt as a checkpoint file without it\
 *version 9.2(4) Bios:version*             Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
 
-If configuration application fails the following cmds are useful to tshoot on the NXOS device:
-*show account log*                See the cmds run by NAPALM
+If configuration application fails the following cmds are useful to tshoot on the NXOS device:\
+*show account log*                See the cmds run by NAPALM\
 *show rollback status*            Check whether the install failed or not, sometimes NAPALM session can close or timeout but the config still be applied
 *show rollback log exec*          Show the cmds run, can workout from this what cmd caused it to fail
 
-If the install fails the files will be left on the NXOS so you can manually attempt the change.
-*show diff rollback-patch file sot_file file canadiate*                       Check the config difference on the device
-*rollback running-config file candidate_config.txt verbose*                   Manually do the config_replace, verbose shows cmds entered
+If the install fails the files will be left on the NXOS so you can manually attempt the change.\
+*show diff rollback-patch file sot_file file canadiate*                       Check the config difference on the device\
+*rollback running-config file candidate_config.txt verbose*                   Manually do the config_replace, verbose shows \cmds entered
 *rollback running-config file rollback_config.txt*                            To rollback the config changes
 
 ## Notes and Improvements
 
 Tested on lab of 6 devices running code 9.2(4)
 
-1. Improvemtns to current version
-Fix MLAG interfaces, either make /30 or change ips as are 1 out (i.e 0 and 1 rather than 1 and 2)
-Add a flag to easily toggle on/off print diffs to screen
-Improve the tags
-Add a rolback play for NAPALM
+1. Improvemtns to current version\
+Fix MLAG interfaces, either make /30 or change ips as are 1 out (i.e 0 and 1 rather than 1 and 2)\
+Add a flag to easily toggle on/off print diffs to screen\
+Improve the tags\
+Add a rolback play for NAPALM\
 Add simple example Diagram for 2 sp, 2 bdr, 2 lf
 
-2. Add validation checks
--Validate input data is correct (addresses valid, follows naming formats, intergrars, etc), based on my compliance requirements
--Output is expected, compared to what expect from the input file
--Validate LLDP to check cabling correct, BGP peerings, what else???
+2. Add validation checks\
+-Validate input data is correct (addresses valid, follows naming formats, intergrars, etc), based on my compliance requirements\
+-Output is expected, compared to what expect from the input file\
+-Validate LLDP to check cabling correct, BGP peerings, what else???\
 
 3. Update Netbox with information used to build the fabric
 
-4. Redo services data models and add:
-Remove complexity from the templates, put into jinja2 filters isntead
-Have options to deploy as replace config or as merge config. Maybe sperate playbooks?
+4. Redo services data models and add:\
+Remove complexity from the templates, put into jinja2 filters isntead\
+Have options to deploy as replace config or as merge config. Maybe sperate playbooks?\
 Validation checks for services
 
-5. Nice to have
-Add fabric vPC and multisite
+5. Nice to have\
+Add fabric vPC and multisite\
 Add templates for Arista
