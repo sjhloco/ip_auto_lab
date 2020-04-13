@@ -4,32 +4,52 @@ bse:
     border_name: 'DC1-N9K-BORDER'
     leaf_name: 'DC1-N9K-LEAF'
 
+  mgmt_acl:
+    - acl_name: SNMP_ACCESS
+      source: [10.10.20.43/24, 10.10.10.43/24]
+      port: [udp, 161]
+    - acl_name: SSH_ACCESS
+      source: [10.10.10.0/24, 10.255.254.0/24, 10.10.108.0/24, 192.168.255.0/24]
+      port: [tcp, 22]
+
+  acl:
+    snmp:
+      name: SNMP_ACCESS
+      source: [10.10.20.43/24, 10.10.10.43/24]
+      port: [udp, 161]
+    ssh:
+      name: SSH_ACCESS
+      source: [10.10.10.0/24, 10.255.254.0/24, 10.10.108.0/24, 192.168.255.0/24]
+      port: [tcp, 22]
+
+
+
 name: 'spine_name'
 
 inventory_hostname: 'DC1-N9K-LEAF01'
 
 
 
-# fbc:
-#   network_size:
-#     num_spines: 2
-#     num_borders: 2
-#     num_leafs: 2
+fbc:
+  network_size:
+    num_spines: 2
+    num_borders: 2
+    num_leafs: 2
 
-#   route:
-#     ospf:
-#       pro: 'underlay'
-#       area: 0.0.0.0
+  route:
+    ospf:
+      pro: 'underlay'
+      area: 0.0.0.0
 
-#   adv:
-#     bse_intf:
-#       intf_fmt: Ethernet1/            # Switch interface, must be same on all switches. First 3 letters used in interface descriptions
-#       ec_fmt: Port-channel
-#       sp_to_lf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
-#       sp_to_bdr: 11                     # First interface used for SPINE to BORDER links (1 to 4)
-#       lf_to_sp: 1                        # First interface used LEAF to SPINE links (1 to 4)
-#       bdr_to_sp: 1                      # First interface used BORDER to SPINE links (1 to 4)
-#       mlag_peer: 127-128                   # Interfaces used for the VPC peer Link
+  adv:
+    bse_intf:
+      intf_fmt: Ethernet1/            # Switch interface, must be same on all switches. First 3 letters used in interface descriptions
+      ec_fmt: Port-channel
+      sp_to_lf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
+      sp_to_bdr: 11                     # First interface used for SPINE to BORDER links (1 to 4)
+      lf_to_sp: 1                        # First interface used LEAF to SPINE links (1 to 4)
+      bdr_to_sp: 1                      # First interface used BORDER to SPINE links (1 to 4)
+      mlag_peer: 127-128                   # Interfaces used for the VPC peer Link
 
 
 #     lp:
@@ -82,7 +102,7 @@ lp:
 sites_alt:
   - name: site1
     blah: blahblah
-    component_name: null 
+    component_name: null
   - name: site2
     blah: blahblah
     component_name: php_site

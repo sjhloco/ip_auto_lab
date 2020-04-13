@@ -1,0 +1,8 @@
+---
+- name: "SYS >> Generating fabric config snippets"
+  template:
+    src: "{{ ansible_network_os }}/fabric_template.j2"
+    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
+  changed_when: False           # Stops it reporting changes in playbook summary
+  check_mode: False             # These tasks still make changes when in check mode
+  tags: fabric

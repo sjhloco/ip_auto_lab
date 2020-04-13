@@ -1,4 +1,4 @@
-########## loopbacks ##########
+{####### Loopback interfaces #######}
 {% for lp in intf_lp %}
 interface {{ lp.name }}
   description {{ lp.descr }}
@@ -7,38 +7,26 @@ interface {{ lp.name }}
   ip address {{ lp.mlag_lp_addr }} secondary
 {% endif %}
   ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
-
+  no shutdown
 {% endfor %}
-########## Fabric Interfaces ##########
+{# Not in base template as is dependant on loopback existing #}
+logging source-interface {{ bse.services.src_int }}
+
+{####### Fabric interfaces #######}
 {% for intf, descr in intf_fbc.items() %}
 interface {{ intf }}
-  description UPLINK > {{ descr }}
+  description {{ descr }}
   no switchport
   medium p2p
   ip unnumbered {{ intf_lp[0]['name'] }}
   ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
   no shutdown
-
 {% endfor %}
 
+{####### VPC Configuration #######}
 {% if bse.device_name.spine not in inventory_hostname %}
-#################### VPC Config ####################
-{% for intf, descr in intf_mlag.items() %}
-interface {{ intf }}
-  description {{ descr }}
-  switchport mode trunk
-  switchport trunk allowed vlan all
-  vpc peer-link
-  spanning-tree port type network
-{% if fbc.adv.bse_intf.ec_fmt not in intf %}
-  channel-group {{ fbc.adv.mlag.peer_po }} mode active
-{% endif %}
-  no shut
-
-{% endfor %}
 vlan {{ fbc.adv.mlag.peer_vlan }}
   name special_svi_over_peer-link
-
 interface Vlan {{ fbc.adv.mlag.peer_vlan }}
   description special_svi_over_peer-link
   no shutdown
@@ -54,32 +42,47 @@ vpc domain {{ fbc.adv.mlag.domain }}
 {% if inventory_hostname[-2:]|int is odd %}
   role priority 8192
 {# Keepalive peer uses mgmt interface with IP worked out based on odd/even name (add/minus +1) #}
-  peer-keepalive destination {{ ansible_host | ipmath(1) }} source {{ ansible_host }} vrf management
+  peer-keepalive destination {{ ansible_host | ipmath(1) }} source {{ ansible_host }}
 {% else %}
   role priority 16384
-  peer-keepalive destination {{ ansible_host | ipmath(-1) }} source {{ ansible_host }} vrf management
+  peer-keepalive destination {{ ansible_host | ipmath(-1) }} source {{ ansible_host }}
 {% endif %}
   peer-gateway
-  ip arp synchronize
   auto-recovery
+  ip arp synchronize
 
-#################### VXLAN Config ####################
+{####### VPC Interfaces #######}
+{% for intf, descr in intf_mlag.items() %}
+interface {{ intf }}
+  description {{ descr }}
+  switchport
+  spanning-tree port type network
+{% if fbc.adv.bse_intf.ec_fmt in intf %}
+  switchport mode trunk
+  switchport trunk allowed vlan 1-4094
+  vpc peer-link
+{% else %}
+  channel-group {{ fbc.adv.mlag.peer_po }} force mode active
+{% endif %}
+  no shutdown
+{% endfor %}
+
+{####### VXLAN Configuration #######}
 interface nve1
   advertise virtual-rmac
   no shutdown
   host-reachability protocol bgp
   source-interface {{ intf_lp[1]['name'] }}
-
 {# Only adds the leafs as they are the only devices with SVIs  #}
-fabric forwarding anycast-gateway-mac {{ bse_adv.acast_gw_mac }}
+fabric forwarding anycast-gateway-mac {{ fbc.acast_gw_mac }}
 {% endif %}
-#################### OSPF Config ####################
-router ospf {{ fbc.route.ospf.pro }}
- router-id {{ intf_lp[0]['ip'] }}
 
-#################### BGP Config ####################
+{####### Routing Configuration #######}
+router ospf {{ fbc.route.ospf.pro }}
+ router-id {{ intf_lp[0]['ip'].split('/') | first }}
+
 router bgp {{ fbc.route.bgp.as_num }}
-  router-id {{ intf_lp[0]['ip'] }}
+  router-id {{ intf_lp[0]['ip'].split('/') | first }}
   address-family l2vpn evpn
 {% if bse.device_name.spine not in inventory_hostname %}
     advertise-pip

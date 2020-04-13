@@ -2,62 +2,116 @@
 # This playbook is used to generate the different configuration snippets
 
 # 1. Create the file structure
-- name: "Create file structure"
-  hosts: all
-  connection: local
-  vars_files:
-    - vars/ansible.yml
-  tasks:
-  - block:
-    - name: "SYS >> Delete the directory"
-      file: path="{{ ans.dir_path }}" state=absent
-      changed_when: False
-    - name: "Creating file structure"
-      file: path="{{ ans.dir_path }}/{{ inventory_hostname }}" state=directory
-      changed_when: False
-    check_mode: False
-    tags: dir
-
-# 2. Create the base config snippets using basetemplate.j2
-- name: "Create base config snippets"
-  hosts: all
-  connection: local
-  vars_files:
-    - vars/ansible.yml
-    - vars/base.yml
-  tasks:
-  - name: "SYS >> Create config snippets"
-    template:
-      src: base_template.j2
-      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/base.cfg"
-    tags: base
-
-# 3. Create the fabric config snippets using fabric_template.j2
-- name: "Create fabric config snippets"
+- name: "Deploy Leaf and Spine DC"
   hosts: all
   connection: local
   vars_files:
     - vars/ansible.yml
     - vars/base.yml
     - vars/fabric.yml
-  tasks:
-  - name: "SYS >> Create config snippets"
-    template:
-      src: fabric_template.j2
-      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
-    tags: fabric
 
-- name: "Get facts"
-  hosts: all
+  pre_tasks:
+    - name: "Create the localhost environment"
+      block:
+      - name: "SYS >> Cleaning up the directory"
+        file:
+          path: "{{ ans.dir_path }}"
+          state: absent
+          force: yes
+        changed_when: False
+      - name: "SYS >> Creating file structure"
+        file: path="{{ ans.dir_path }}/{{ inventory_hostname }}" state=directory
+        changed_when: False
+      - name: "SYS >> Creating diff directory"
+        file: path="{{ ans.dir_path }}/diff" state=directory
+        changed_when: False         # Stops it reporting changes in playbook summary
+      check_mode: False             # These tasks still make changes when in check mode
+      tags: dir
+
+# 2. Create the config snippets using templates within the roles
+  roles:
+    - base
+    - fabric
+
   tasks:
-  - block:
-    - name: "SYS >> Get facts"
-      napalm_get_facts:
+    - name: "SYS >> Joining config snippets into one file"
+      assemble:
+        src: "{{ ans.dir_path }}/{{ inventory_hostname }}"
+        dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config.cfg"
+      changed_when: False         # Stops it reporting changes in playbook summary
+      check_mode: False             # These tasks still make changes when in check mode
+      tags: join
+
+    - name: "NET >> Apply changes using replace config"
+      napalm_install_config:
         provider: "{{ ans.creds_all }}"
-        dev_os: "{{ os }}"
-      register: output
-    - debug: var=output
-    tags: facts
+        dev_os: "{{ ansible_network_os }}"
+        timeout: 120                # NXOS takes between 60 to 90 seconds to deploy all changes
+        config_file: "{{ ans.dir_path }}/{{ inventory_hostname }}/config.cfg"
+        commit_changes: True
+        replace_config: True
+        diff_file: "{{ ans.dir_path }}/diff/{{ inventory_hostname }}.txt"
+        get_diffs: True
+      register: changes
+      tags: config
+    - debug: var=changes.msg.splitlines()
+    # - debug:
+    #     msg: "{{ output.msg.split('\n') }}"
+      tags: config
+
+
+#  - block:
+#     - name: "SYS >> Get facts"
+#       napalm_get_facts:
+#         provider: "{{ ans.creds_all }}"
+#         dev_os: "{{ ansible_network_os }}"
+#       register: output
+#     - debug: var=output
+#     tags: facts
+
+
+# 5. Verifiy ICMP reachability over interfaces
+# - name: "Verify reachability"
+#   hosts: router
+#   tasks:
+#     - block:
+#       - name: "NET >> Pinging between interfaces"
+#         napalm_ping:
+#           provider: "{{ creds_all }}"
+#           destination: "{{ item.ipaddr }}"
+#         loop: "{{ bgp.neighbors }}"
+#         register: intf_output
+#       # Use assert to make sure no more than 1 packet is lost
+#       - name: "SYS >> Verifying ICMP between interfaces"
+#         assert:
+#           that:
+#             - intf_output.results[0].ping_results.success.packet_loss <= 1
+#           msg: "{{ intf_output.results[0].invocation.module_args.destination }} has some packetloss"
+#         with_dict: "{{ intf_output.results[0].ping_results.success }}"
+#       when: not ansible_check_mode
+#       tags: [verify_intf, verify_all, deploy_all, run_all]
+
+# # 6. Verifiy BGP peerings
+# - name: "Verify BGP peerings"
+#   hosts: router
+#   tasks:
+#     - block:
+#       - name: "NET >> Checking BGP Peerings"
+#         napalm_get_facts:
+#           provider: "{{ creds_all }}"
+#           dev_os: "{{ ansible_network_os }}"
+#           filter: bgp_neighbors
+#       # Use assert to make sure all BGP peerings are up
+#       - name: "SYS >> Verifying that all configured BGP peerings are up"
+#         assert:
+#           that:
+#             - item.value.is_up
+#           msg: "{{ item.key }} is down"
+#         with_dict: "{{ napalm_bgp_neighbors.global.peers }}"
+#       when: not ansible_check_mode
+#       tags: [verify_bgp, verify_all, deploy_all, run_all]
+
+
 
 
 

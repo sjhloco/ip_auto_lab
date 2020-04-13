@@ -1,9 +1,7 @@
 ---
 ################ Login and Ansible settings (normally would be in all.yml) ################
-
 # Python location on the Ansible host (operating system specific)
-ansible_python_interpreter: "/usr/bin/env python"           # Ubuntu
-
+ansible_python_interpreter: "/usr/bin/env python"
 
 ans:
   # Base directory Location to store the generated configuration snippets

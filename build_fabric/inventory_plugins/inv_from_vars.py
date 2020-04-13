@@ -181,9 +181,9 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         # 4d. BORDER, LEAF: Create nested dictionary for border and leaf MLAG interfaces
         # Create a list of dictionaries of all MLAG ports and their short names for the description [{int_name: short_int_name}]
+        mlag_ports[self.bse_intf['ec_fmt'] + str(self.mlag['peer_po'])] = self.bse_intf['ec_short'] + str(self.mlag['peer_po'])
         for intf_num in self.bse_intf['mlag_peer'].split('-'):
             mlag_ports[self.bse_intf['intf_fmt'] + intf_num] = self.bse_intf['intf_short'] + intf_num
-        mlag_ports[self.bse_intf['ec_fmt'] + str(self.mlag['peer_po'])] = self.bse_intf['ec_short'] + str(self.mlag['peer_po'])
 
         for dev in self.leaf + self.border:
             for intf, intf_short in mlag_ports.items():
@@ -193,7 +193,6 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 # If device_name ends in an even number decreases the device_name by 1
                 else:                           # If device_name ends in an even number
                     self.mlag_int[dev][intf] = 'MLAG peer-link > ' + dev[:-2] + "{:02d} ".format(int(dev[-2:]) -1) + intf_short
-
 
 # ============================ 5. Create the inventory ==========================
 # 5. Adds groups, hosts and host_vars to create the inventory file
@@ -209,16 +208,16 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             if gr == 'spine':
                 for sp in self.spine:
                     self.inventory.add_host(sp, gr)
-                    self.inventory.set_variable(gr, 'os', self.device_type['spine_os'])
+                    self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['spine_os'])
             if gr == 'border':
                 for br in self.border:
                     self.inventory.add_host(br, gr)
-                    self.inventory.set_variable(gr, 'os', self.device_type['border_os'])
+                    self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['border_os'])
 
             if gr == 'leaf':
                 for lf in self.leaf:
                     self.inventory.add_host(lf, gr)
-                    self.inventory.set_variable(gr, 'os', self.device_type['leaf_os'])
+                    self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['leaf_os'])
 
         #5b. Adds host_vars for all the IP dictionaries created in 'create_ip' method
         for host, mgmt_ip in self.all_mgmt.items():

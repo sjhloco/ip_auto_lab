@@ -1,50 +1,21 @@
-==== INVENTORY ==== 
+==== APPLY CONFIG ====
 
-1. rewrite looopbacks as follows:
-intf_lp:
-  - name: loopback0
-    ip: 192.168.100.17/32
-    decrip: 'LP > Routing protocol RID and peerings'
-  - name: loopback1:
-    ip: 192.168.100.37/32: 
-    decrip: "LP > VTEP Tunnels (PIP) and VPC (VIP)"
-    vpc_lp_addr: "192.168.100.51/32"
-  - name: loopback2:
-    ip: 192.168.100.58/32: 
-    decrip: "LP > BGW anycast address"
+Fix MLAG interfaces, either make /30 or change ips as are 1 out (i.e 0 and 1 rather than 1 and 2)
+Add a flag to easily toggle on/off print diffs to screen
+Improve the tags
+Add a rolback play for NAPALM
+Add simple example Diagram for 2 sp, 2 bdr, 2 lf
 
-will create self.all_lb = defaultdict(dict) and add as a dict
 
-then try render using:
-{% for lp in intf_lp %}
-interface {{ lp.name }}
-  description {{ lp.decrip }}
-  ip address {{ lp.ip }}
-{% if lp |length  == 3 %}
-  ip address {{ lp.vpc_lp_addr }} secondary
-{% endif %}
-  ip router ospf {{ fbc.route.ospf.pro }} area {{ fbc.route.ospf.area }}
+CHeck if can get any ideas from
+https://overlaid.net/2019/02/19/arista-bgp-evpn-ansible-lab/
+https://github.com/varnumd/ansible-arista-evpn-lab
 
-{% endfor %}
-
-and for names or ips:
-intf_lp[0]['name']
-intf_lp[0]['ip']
-
-JUST NEED TO MAKE SURE ORDER IN LIST IS CORRECT BASED ON LP ROLE
-
-2. Rewrite the loopback interfaces into same dict format as VPC and fabric interfaces, will it simiplfy code????
-3. TIdy up and add proper notes on inventory and template
-
-==== APPLY CONFIG ==== 
-1. Try applying base render to switches
-2. Try out applying base and fabric render to switches
-
-==== VALDIATE ==== 
-1. Validate details in the input files, i.e names are right, masks, ipaddresses valid, etc
-2. Validate everything uo after the fabric deployed
-3. Output is expected, compared to what expect from the inout file - could tie into input file test (8)
-4. Update Netbox with info
+==== VALDIATE ====
+2. Add validation checks
+-Validate input data is correct (addresses valid, follows naming formats, intergrars, etc), based on my compliance requirements
+-Output is expected, compared to what expect from the input file
+-Validate LLDP to check cabling correct, BGP peerings, what else???
 
 AT this point halfway through, evaluate as next need to add services
 
