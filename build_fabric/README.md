@@ -112,20 +112,20 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,co
 ## Caveats
 
 The following caveats cameout of building templates for NXOS config_replace:\
-*feature interface-vlan* &emsp;&emsp;&emsp;  Need to make sure also have *interface vlan1* in your config file\
+*feature interface-vlan* &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;    Need to make sure also have *interface vlan1* in your config file\
 *logging source-interface loopback1* &emsp;&emsp;&emsp;  Order specifc so the loopback intefrace must be before it in the template
 
 The following lines to need to be at the top of the config_replace template:\
 *!Command: Checkpoint cmd vdc 1* &emsp;&emsp;&emsp;  The nexus wont recognise candidate_config.txt as a checkpoint file without it\
-*version 9.2(4) Bios:version* &emsp;&emsp;&emsp;  Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
+*version 9.2(4) Bios:version* &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;  Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
 
 If configuration application fails the following cmds are useful to tshoot on the NXOS device:\
-*show account log* &emsp;&emsp;&emsp;  See the cmds run by NAPALM\
+*show account log* &emsp;&emsp;&emsp;&emsp;  See the cmds run by NAPALM\
 *show rollback status* &emsp;&emsp;&emsp;  Check whether the install failed or not, sometimes NAPALM session can close or timeout but the config still be applied
 *show rollback log exec* &emsp;&emsp;&emsp;  Show the cmds run, can workout from this what cmd caused it to fail
 
 If the install fails the files will be left on the NXOS so you can manually attempt the change.\
-*show diff rollback-patch file sot_file file canadiate* &emsp;&emsp;&emsp;  Check the config difference on the device\
+*show diff rollback-patch file sot_file file canadiate* &emsp;&emsp;&emsp;&emsp;  Check the config difference on the device\
 *rollback running-config file candidate_config.txt verbose* &emsp;&emsp;&emsp;  Manually do the config_replace, verbose shows \cmds entered
 *rollback running-config file rollback_config.txt* &emsp;&emsp;&emsp;  To rollback the config changes
 
