@@ -16,12 +16,14 @@ This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By defaul
 A custom inventory plugin is used to create the dynamic inventory and *host_vars* of all the interfaces and IP addresses needed for the fabric. By doing this in the inventory it abstracts the complexity from the *base* and *fabric* templates keeping them clean and simple meaking it much easier to expand this playbook build templates for other brands.
 Loopbacks are a stored in list of dictionaries so the dict values (ip and intf) can easily be referenced whereas interfaces are a dictionary as they have no IP address so only need to be looped over to create the interfaces.
 
-When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.\
+When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.
 
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph**\
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list**\
-**ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01**\
-**ansible-playbook playbook.yml -i inv_from_vars_cfg.yml**                                                  *To run against a playbook*
+```bash
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list
+ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                 To run against a playbook
+```
 
 ## Core variable Elements
 
@@ -53,16 +55,16 @@ These core elements are the minimun requirements to create the declarative fabri
 
 *address_incre:* The increment that is added to the subnet and device hostname number to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addresses unique.
 
-- *spine_ip: 11*                      Spine mgmt IP and routing loopback addresses will be from .11 to .14
-- *border_ip: 16*                     Border mgmt IP and routing loopback addresses will be from .16 to .19
-- *leaf_ip: 21*                     Leaf mgmt IP and routing loopback addresses will be from .21 to .30
-- *border_vtep_lp: 36*                     Border VTEP loopback addresses will be from .36 to .39
-- *eaf_vtep_lp: 41*                     Leaf VTEP loopback addresses will be from .41 to .50
-- *border_mlag_lp: 56*                     Pair of border shared loopback addresses (VIP) will be from .56 to .57
-- *leaf_mlag_lp: 51*                     Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
-- *border_bgw_lp: 58*                     Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
-- *mlag_leaf_ip: 1*                     Start IP for Leaf Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
-- *mlag_border_ip: 11*                     Start IP for border  Peer Links, so BORDER1 is .11, BORDER2 .12, etc
+- *spine_ip: 11*. &emsp;&emsp;&emsp;  Spine mgmt IP and routing loopback addresses will be from .11 to .14
+- *border_ip: 16* &emsp;&emsp;&emsp;  Border mgmt IP and routing loopback addresses will be from .16 to .19
+- *leaf_ip: 21* &emsp;&emsp;&emsp;  Leaf mgmt IP and routing loopback addresses will be from .21 to .30
+- *border_vtep_lp: 36* &emsp;&emsp;&emsp;  Border VTEP loopback addresses will be from .36 to .39
+- *eaf_vtep_lp: 41* &emsp;&emsp;&emsp;  Leaf VTEP loopback addresses will be from .41 to .50
+- *border_mlag_lp: 56* &emsp;&emsp;&emsp;  Pair of border shared loopback addresses (VIP) will be from .56 to .57
+- *leaf_mlag_lp: 51* &emsp;&emsp;&emsp;  Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
+- *border_bgw_lp: 58* &emsp;&emsp;&emsp;  Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
+- *mlag_leaf_ip: 1* &emsp;&emsp;&emsp;  Start IP for Leaf Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
+- *mlag_border_ip: 11* &emsp;&emsp;&emsp;  Start IP for border  Peer Links, so BORDER1 is .11, BORDER2 .12, etc
 
 ## Installation and Prerequisites
 
@@ -110,22 +112,22 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,co
 ## Caveats
 
 The following caveats cameout of building templates for NXOS config_replace:\
-*feature interface-vlan*                              Need to make sure also have *interface vlan1* in your config file\
-*logging source-interface loopback1*                  Order specifc so the loopback intefrace must be before it in the template
+*feature interface-vlan* &emsp;&emsp;&emsp;  Need to make sure also have *interface vlan1* in your config file\
+*logging source-interface loopback1* &emsp;&emsp;&emsp;  Order specifc so the loopback intefrace must be before it in the template
 
 The following lines to need to be at the top of the config_replace template:\
-*!Command: Checkpoint cmd vdc 1*          The nexus wont recognise candidate_config.txt as a checkpoint file without it\
-*version 9.2(4) Bios:version*             Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
+*!Command: Checkpoint cmd vdc 1* &emsp;&emsp;&emsp;  The nexus wont recognise candidate_config.txt as a checkpoint file without it\
+*version 9.2(4) Bios:version* &emsp;&emsp;&emsp;  Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
 
 If configuration application fails the following cmds are useful to tshoot on the NXOS device:\
-*show account log*                See the cmds run by NAPALM\
-*show rollback status*            Check whether the install failed or not, sometimes NAPALM session can close or timeout but the config still be applied
-*show rollback log exec*          Show the cmds run, can workout from this what cmd caused it to fail
+*show account log* &emsp;&emsp;&emsp;  See the cmds run by NAPALM\
+*show rollback status* &emsp;&emsp;&emsp;  Check whether the install failed or not, sometimes NAPALM session can close or timeout but the config still be applied
+*show rollback log exec* &emsp;&emsp;&emsp;  Show the cmds run, can workout from this what cmd caused it to fail
 
 If the install fails the files will be left on the NXOS so you can manually attempt the change.\
-*show diff rollback-patch file sot_file file canadiate*                       Check the config difference on the device\
-*rollback running-config file candidate_config.txt verbose*                   Manually do the config_replace, verbose shows \cmds entered
-*rollback running-config file rollback_config.txt*                            To rollback the config changes
+*show diff rollback-patch file sot_file file canadiate* &emsp;&emsp;&emsp;  Check the config difference on the device\
+*rollback running-config file candidate_config.txt verbose* &emsp;&emsp;&emsp;  Manually do the config_replace, verbose shows \cmds entered
+*rollback running-config file rollback_config.txt* &emsp;&emsp;&emsp;  To rollback the config changes
 
 ## Notes and Improvements
 
