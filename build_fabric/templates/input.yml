@@ -1,122 +1,168 @@
-bse:
-  device_name:                    # The start (DC1-N9K) can be changed, however the rest must NOT be chaneged as is used in the scritping logic
-    spine_name: 'DC1-N9K-SPINE'
-    border_name: 'DC1-N9K-BORDER'
-    leaf_name: 'DC1-N9K-LEAF'
-
-  mgmt_acl:
-    - acl_name: SNMP_ACCESS
-      source: [10.10.20.43/24, 10.10.10.43/24]
-      port: [udp, 161]
-    - acl_name: SSH_ACCESS
-      source: [10.10.10.0/24, 10.255.254.0/24, 10.10.108.0/24, 192.168.255.0/24]
-      port: [tcp, 22]
-
-  acl:
-    snmp:
-      name: SNMP_ACCESS
-      source: [10.10.20.43/24, 10.10.10.43/24]
-      port: [udp, 161]
-    ssh:
-      name: SSH_ACCESS
-      source: [10.10.10.0/24, 10.255.254.0/24, 10.10.108.0/24, 192.168.255.0/24]
-      port: [tcp, 22]
 
 
 
-name: 'spine_name'
-
-inventory_hostname: 'DC1-N9K-LEAF01'
 
 
 
-fbc:
-  network_size:
-    num_spines: 2
-    num_borders: 2
-    num_leafs: 2
-
-  route:
-    ospf:
-      pro: 'underlay'
-      area: 0.0.0.0
-
-  adv:
-    bse_intf:
-      intf_fmt: Ethernet1/            # Switch interface, must be same on all switches. First 3 letters used in interface descriptions
-      ec_fmt: Port-channel
-      sp_to_lf: 1                        # First interface used for SPINE to LEAF links (1 to 10)
-      sp_to_bdr: 11                     # First interface used for SPINE to BORDER links (1 to 4)
-      lf_to_sp: 1                        # First interface used LEAF to SPINE links (1 to 4)
-      bdr_to_sp: 1                      # First interface used BORDER to SPINE links (1 to 4)
-      mlag_peer: 127-128                   # Interfaces used for the VPC peer Link
 
 
-#     lp:
-#       rtr:
-#         loopback0: LP > Routing protocol RID and peerings
-#       vtep:
-#         loopback1: LP > VTEP Tunnels (PIP) and VPC (VIP)
-#       bgw:
-#         loopback2: LP > BGW anycast address
+# fbc:
+#   adv:
+#     # Seed interfaces used to create the fabric. These are the first interfaces used, the inventory pluggin increments them
+#     bse_intf:
+#       intf_fmt: Ethernet1/                  # Switch interface naming format
+#       intf_short: Eth1/                     # Used in descritions of interfaces
+#       ec_fmt: Port-channel                  # LAG interface naming format
+#       ec_short: Po                          # Used in descritions of LAG interfaces
+#       sp_to_lf: 1                           # First interface used for SPINE to LEAF links (1 to 10)
+#       sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 44)
+#       lf_to_sp: 1                           # First interface used LEAF to SPINE links (1 to 4)
+#       bdr_to_sp: 1                          # First interface used BORDER to SPINE links (1 to 4)
+#       mlag_peer: 14-15
 
-#     # All MLAG specific settings except for peer Link interfaces (fabric.yml - base_interface) and subnet (base.yml - addressing)
 #     mlag:
 #       domain: 1                               # MLAG Domain number
 #       peer_po: 1                              # Port-channel used for Peer Link
-#       peer_vlan: 2                            # VLAN used for Peer Link and OSPF peering
-
-#   # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses
-#     addr_incre:
-#       spine_ip: 11                            # SPINE mgmt IP and routing loopback addresses will be from .11 to .14
-#       border_ip: 16                           # BORDER mgmt IP androuting loopback addresses will be from .16 to .19
-#       leaf_ip: 21                             # LEAF mgmt IP androuting loopback addresses will be from .21 to .30
-#       border_vtep_lp: 36                      # BORDER VTEP loopback addresses will be from .36 to .39
-#       leaf_vtep_lp: 41                        # LEAF VTEP loopback addresses will be from .41 to .50
-#       border_mlag_lp: 56                       # Pair of BORDER MLAG loopback addresses will be from .56 to .57
-#       leaf_mlag_lp: 51                         # Pair of LEAF MLAG loopback IP addresses will be from .51 to .55
-#       border_bgw_lp: 58                       # Pair of BORDER BGW loopback addresses will be from .58 to .59
-#       mlag_leaf_ip: 1                          # Start IP for LEAF Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
-#       mlag_border_ip: 11                       # Start IP for BORDER Peer Links, so BORDER1 is .11, BORDER2 .12, etc
-
-lp:
-  loopback0:
-    192.168.100.17/32: 'LP > Routing protocol RID and peerings'
-  loopback1:
-    192.168.100.37/32: "LP > VTEP Tunnels (PIP) and VPC (VIP)"
-    vpc_lp_addr: "192.168.100.51/32"
-  loopback2:
-    192.168.100.58/32: "LP > BGW anycast address"
-
-lp:
-  - name: loopback0
-    ip: 192.168.100.17/32
-    decrip: 'LP > Routing protocol RID and peerings'
-  - loopback1:
-    192.168.100.37/32: "LP > VTEP Tunnels (PIP) and VPC (VIP)"
-    vpc_lp_addr: "192.168.100.51/32"
-  - loopback2:
-    192.168.100.58/32: "LP > BGW anycast address"
+#       peer_vlan: 2
 
 
-sites_alt:
-  - name: site1
-    blah: blahblah
-    component_name: null
-  - name: site2
-    blah: blahblah
-    component_name: php_site
-
-# intf:
-#   Ethernet1/1: UPLINK > DC1-N9K-SPINE01 Eth1/11
-#   Ethernet1/2: UPLINK > DC1-N9K-SPINE02 Eth1/11
-#   Ethernet1/3: UPLINK > DC1-N9K-SPINE03 Eth1/11
-#   Ethernet1/4: UPLINK > DC1-N9K-SPINE04 Eth1/11
 
 
-# intf_mlag:
-#   Ethernet1/127: MLAG peer-link > DC1-N9K-LEAF02 Eth1/127
-#   Ethernet1/128: MLAG peer-link > DC1-N9K-LEAF02 Eth1/128
-#   Port-channel1: MLAG peer-link > DC1-N9K-LEAF02 Po1
 
-# mlag_peer_ip: 10.255.255.1/31
+
+# bse:
+#   services:
+#     domain: 'stesworld.com'
+
+# fbc:
+#   adv:
+#     bse_intf:
+#       intf_fmt: Ethernet1/
+#       intf_short: Eth1/
+
+# hostvars:
+#   DC1-N9K-BORDER01:
+#     ansible_host: "10.10.108.16"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-SPINE01 Eth1/11"
+#       Ethernet1/2: "UPLINK > DC1-N9K-SPINE02 Eth1/11"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.16/32"
+#       name: "loopback1"
+#     - descr: "LP > VTEP Tunnels (PIP) and MLAG (VIP)"
+#       ip: "192.168.100.36/32"
+#       mlag_lp_addr: "192.168.100.56/32"
+#       name: "loopback2"
+#     - descr: "LP > BGW anycast address"
+#       ip: "192.168.100.58/32"
+#       name: "loopback3"
+#     intf_mlag:
+#       Ethernet1/14: "MLAG peer-link > DC1-N9K-BORDER02 Eth1/14"
+#       Ethernet1/15: "MLAG peer-link > DC1-N9K-BORDER02 Eth1/15"
+#       Port-channel1: "MLAG peer-link > DC1-N9K-BORDER02 Po1"
+#     mlag_peer_ip: "10.255.255.11/31"
+#   DC1-N9K-BORDER02:
+#     ansible_host: "10.10.108.17"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-SPINE01 Eth1/12"
+#       Ethernet1/2: "UPLINK > DC1-N9K-SPINE02 Eth1/12"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.17/32"
+#       name: "loopback1"
+#     - descr: "LP > VTEP Tunnels (PIP) and MLAG (VIP)"
+#       ip: "192.168.100.37/32"
+#       mlag_lp_addr: "192.168.100.56/32"
+#       name: "loopback2"
+#     - descr: "LP > BGW anycast address"
+#       ip: "192.168.100.58/32"
+#       name: "loopback3"
+#     intf_mlag:
+#       Ethernet1/14: "MLAG peer-link > DC1-N9K-BORDER01 Eth1/14"
+#       Ethernet1/15: "MLAG peer-link > DC1-N9K-BORDER01 Eth1/15"
+#       Port-channel1: "MLAG peer-link > DC1-N9K-BORDER01 Po1"
+#     mlag_peer_ip: "10.255.255.12/31"
+#   DC1-N9K-LEAF01:
+#     ansible_host: "10.10.108.21"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-SPINE01 Eth1/1"
+#       Ethernet1/2: "UPLINK > DC1-N9K-SPINE02 Eth1/1"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.21/32"
+#       name: "loopback1"
+#     - descr: "LP > VTEP Tunnels (PIP) and MLAG (VIP)"
+#       ip: "192.168.100.41/32"
+#       mlag_lp_addr: "192.168.100.51/32"
+#       name: "loopback2"
+#     intf_mlag:
+#       Ethernet1/14: "MLAG peer-link > DC1-N9K-LEAF02 Eth1/14"
+#       Ethernet1/15: "MLAG peer-link > DC1-N9K-LEAF02 Eth1/15"
+#       Port-channel1: "MLAG peer-link > DC1-N9K-LEAF02 Po1"
+#     mlag_peer_ip: "10.255.255.1/31"
+#   DC1-N9K-LEAF02:
+#     ansible_host: "10.10.108.22"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-SPINE01 Eth1/2"
+#       Ethernet1/2: "UPLINK > DC1-N9K-SPINE02 Eth1/2"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.22/32"
+#       name: "loopback1"
+#     - descr: "LP > VTEP Tunnels (PIP) and MLAG (VIP)"
+#       ip: "192.168.100.42/32"
+#       mlag_lp_addr: "192.168.100.51/32"
+#       name: "loopback2"
+#     intf_mlag:
+#       Ethernet1/14: "MLAG peer-link > DC1-N9K-LEAF01 Eth1/14"
+#       Ethernet1/15: "MLAG peer-link > DC1-N9K-LEAF01 Eth1/15"
+#       Port-channel1: "MLAG peer-link > DC1-N9K-LEAF01 Po1"
+#     mlag_peer_ip: "10.255.255.2/31"
+#   DC1-N9K-SPINE01:
+#     ansible_host: "10.10.108.11"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-LEAF01 Eth1/1"
+#       Ethernet1/11: "UPLINK > DC1-N9K-BORDER01 Eth1/1"
+#       Ethernet1/12: "UPLINK > DC1-N9K-BORDER02 Eth1/1"
+#       Ethernet1/2: "UPLINK > DC1-N9K-LEAF02 Eth1/1"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.11/32"
+#       name: "loopback1"
+#   DC1-N9K-SPINE02:
+#     ansible_host: "10.10.108.12"
+#     ansible_network_os: "nxos"
+#     intf_fbc:
+#       Ethernet1/1: "UPLINK > DC1-N9K-LEAF01 Eth1/2"
+#       Ethernet1/11: "UPLINK > DC1-N9K-BORDER01 Eth1/2"
+#       Ethernet1/12: "UPLINK > DC1-N9K-BORDER02 Eth1/2"
+#       Ethernet1/2: "UPLINK > DC1-N9K-LEAF02 Eth1/2"
+#     intf_lp:
+#     - descr: "LP > Routing protocol RID and peerings"
+#       ip: "192.168.100.12/32"
+#       name: "loopback1"
+
+# all:
+#   children:
+#   - "border"
+#   - "leaf"
+#   - "spine"
+#   - "ungrouped"
+# border:
+#   hosts:
+#   - "DC1-N9K-BORDER01"
+#   - "DC1-N9K-BORDER02"
+# leaf:
+#   hosts:
+#   - "DC1-N9K-LEAF01"
+#   - "DC1-N9K-LEAF02"
+# spine:
+#   hosts:
+#   - "DC1-N9K-SPINE01"
+#   - "DC1-N9K-SPINE02"

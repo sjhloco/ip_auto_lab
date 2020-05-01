@@ -1,12 +1,10 @@
 ---
+ ################################# TESTING templates, vars, and napalm getters   #################################
 
-- name: "Create file structure"
-  hosts: all
-  connection: local
-  vars_files:
-    - vars/ansible.yml
-  tasks:
-- name: "SYS >> Create fabric config snippets"
+
+
+- name: "Test templates and vars"
+  # hosts: all
   hosts: all
   connection: local
   vars_files:
@@ -16,14 +14,125 @@
   tasks:
   - name: "SYS >> Create config snippets"
     template:
-      src: fabric_template.j2
-      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/fabric.cfg"
+      # src: roles/validate/templates/nxos/fbc_validate.j2
+      # dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/nxos_val.yml"
+      src: roles/validate/templates/fbc_validate.j2
+      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/napalm_val.yml"
     tags: tmp
-  - name: "SYS >> Print to screen"
-    debug:
-      # msg: "{{ fbc.adv.lp.rtr.keys() |list }}"
-      msg: "{{ intf_lp.fbc.adv.lp.rtr.key() | list }}"
-      # msg: "{{ intf_lp.loopback0.keys() | list | ipaddr('address') }}"
-      # msg:  "{{ '192.168.100.16/32' | ipaddr('address') }}"
-    tags: prt
 
+#   - block:
+#     - name: "NET >> Checking BGP Peerings"
+#       napalm_get_facts:
+#         provider: "{{ ans.creds_all }}"
+#         dev_os: "{{ ansible_network_os }}"
+#         filter: lldp_neighbors
+#       register: output
+#     - debug:
+#         msg: "{{ output }}"
+#     tags: nap
+
+#   - name: "SYS >> Print to screen"
+#     debug:
+#       # msg: "{{ fbc.adv.lp.rtr.keys() |list }}"
+#       msg: "{{ intf_lp.fbc.adv.lp.rtr.key() | list }}"
+#       # msg: "{{ intf_lp.loopback0.keys() | list | ipaddr('address') }}"
+#       # msg:  "{{ '192.168.100.16/32' | ipaddr('address') }}"
+#     tags: prt
+
+
+ ################################# TESTING napalm VALDIATION    #################################
+- name: "test NAPALM validate"
+  hosts: all
+  connection: local
+  vars_files:
+    - vars/ansible.yml
+
+  tasks:
+    - name: Use Napalm validate LLDP
+      napalm_validate:
+        provider: "{{ ans.creds_all }}"
+        dev_os: "{{ ansible_network_os }}"
+        validation_file: /home/ste/device_configs/{{ inventory_hostname }}/napalm_val.yml
+      register: nap_val
+      ignore_errors: yes
+
+    - name: Display full compliance report
+      debug:
+        var: nap_val.compliance_report
+
+    - name: Compliance check failed
+      fail:
+        msg: "Non-compliant state encountered. Refer to the full report."
+      when: not nap_val.compliance_report.complies
+
+
+
+ ################################# TESTING non-napalm VALDIATION    #################################
+
+# - name: "SYS >> test non naplam validate"
+#   # hosts: localhost
+#   hosts: DC1-N9K-LEAF01
+#   connection: local
+#   vars_files:
+#     - vars/ansible.yml
+#     - vars/base.yml
+#     - vars/fabric.yml
+#     - vars/fbc_validate.yml
+#   tasks:
+#   - block:
+#     - name: "NET >> Get output"
+#       napalm_cli:
+#         provider: "{{ ans.creds_all }}"
+#         dev_os: "{{ ansible_network_os }}"
+#         args:
+#           commands:
+#             - "{{ item.keys() | list | first }}"
+#       register: output
+#       loop: "{{ cmds }}"
+#       loop_control:
+#         label: "{{ item.keys() | list | first }}"
+
+#     - name: SYS >> Read in parse_genie role
+#       include_role:
+#         name: clay584.parse_genie
+# ### OPT1
+#     - name: SYS >> Parse BGP
+#       set_fact:
+#         genie_ospf: "{{ output.results[0].cli_results.values()  | list | first | parse_genie(command='show ip ospf neighbors detail', os='nxos') }}"
+#         genie_lag: "{{ output.results[1].cli_results.values() | list | first | parse_genie(command='show port-channel summary', os='nxos') }}"
+#         genie_mlag: "{{ output.results[2].cli_results.values() | list | first | parse_genie(command='show vpc', os='nxos') }}"
+### OPT1
+    # - name: SYS >> Parse BGP
+    #   set_fact:
+    #     genie_ospf: "{{ item.cli_results.values() | list | first | parse_genie(command=item.cli_results.keys() | list | first, os='nxos') }}"
+    #     # genie_lag: "{{ item.cli_results.values() | list | first | parse_genie(command='show port-channel summary', os='nxos') }}"
+    #     # genie_mlag: "{{ item.cli_results.values() | list | first | parse_genie(command='show vpc', os='nxos') }}"
+    #   loop: "{{ output.results }}"
+    #   loop_control:
+    #     label: "{{ item.cli_results.keys() | list | first }}"
+
+    # - debug:
+    #     var: genie_ospf
+    # - debug:
+    #     var: genie_lag
+    # - debug:
+    #     var: genie_mlag
+
+
+
+
+   ################################# TESTING ASSERT    #################################
+  # - name: "SYS >> Validating the contents of base.yml"
+  #   assert:
+  #     that: "{{ bse.device_name | validate_base(bse.addr, bse.users) }} == 'base.yml unittest pass'"
+  #     success_msg: "base.yml contents unittest passed"
+  #     fail_msg: "{{ bse.device_name | validate_base(bse.addr, bse.users) }}"
+
+  # - name: "SYS >> Validating the contents of fabric.yml"
+  #   assert:
+  #     that: "{{ fbc.network_size | validate_fabric(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }} == 'fabric.yml unittest pass'"
+  #     success_msg: "fabric.yml contents unittest passed"
+  #     fail_msg: "{{ fbc.network_size | validate_fabric(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
+  #   run_once: true
+    # set_fact:     # Passes output through filter with bgp_neigh variable
+    #   bgp_table: "{{ bgp_output.ansible_facts | bgp_filter(inventory_hostname, bgp_neigh) }}"

@@ -94,7 +94,7 @@ Can optionally run the *ssh_key_playbook.yml* script to automatically add all th
 
 ```bash
 sudo apt install ssh-keyscan
-ansible-playbook ssh_key_add.yml -i ssh_hosts
+ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 ```
 
 ## Running playbook

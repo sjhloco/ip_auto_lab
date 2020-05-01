@@ -1,39 +1,173 @@
-{# Managment ACLs, start sequence number has 10 added with each loop iteration #}
-{# ip access-list {{ bse.acl.snmp.name }}
-{% set seq = namespace(cnt=10) %}
-{% for host in bse.acl.snmp.source %}
-  {{ seq.cnt }} permit {{ bse.acl.snmp.port[0] }} {{ host }} any eq {{ bse.acl.snmp.port[1] }}
-{% set seq.cnt= seq.cnt + 10 %}
-{% endfor %}
-  {{ seq.cnt }} deny ip any any log
-ip access-list {{ bse.acl.ssh.name }}
-{% set seq = namespace(cnt=10) %}
-{% for host in bse.acl.ssh.source %}
-  {{ seq.cnt }} permit {{ bse.acl.ssh.port[0] }} {{ host }} any eq {{ bse.acl.ssh.port[1] }}
-{% set seq.cnt= seq.cnt + 10 %}
-{% endfor %}
-  {{ seq.cnt }} deny ip any any log #}
-
-
-
-
-{# Managment ACLs, start sequence number has 10 added with each loop iteration #}
-{% for acl in bse.mgmt_acl: %}
-{% set seq = namespace(cnt=10) %}
-ip access-list {{ acl.acl_name }}
-{% for host in acl.source %}
-  {{ seq.cnt }} permit {{ acl.port[0] }} {{ host }} any eq {{ acl.port[1] }}
-{% set seq.cnt= seq.cnt + 10 %}
-{% endfor %}
-  {{ seq.cnt }} deny ip any any log
-{% endfor %}
-
-{{ bse.mgmt_acl[0]['acl_name'] }}
-
-
-
-{#
-name
-
-
-{% endfor %}  #}
+    "get_facts": {
+        "complies": true,
+        "present": {
+            "hostname": {
+                "complies": true,
+                "nested": false
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "get_lldp_neighbors": {
+        "complies": true,
+        "present": {
+            "Ethernet1/1": {
+                "complies": true,
+                "nested": false
+            },
+            "Ethernet1/2": {
+                "complies": true,
+                "nested": false
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "get_bgp_neighbors": {
+        "complies": true,
+        "present": {
+            "global": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping VTEP loopback DC1-N9K-LEAF01": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping MLAG loopback DC1-N9K-LEAF01": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping VTEP loopback DC1-N9K-LEAF02": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping MLAG loopback DC1-N9K-LEAF02": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping VTEP loopback DC1-N9K-BORDER01": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping MLAG loopback DC1-N9K-BORDER01": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping VTEP loopback DC1-N9K-BORDER02": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "ping MLAG loopback DC1-N9K-BORDER02": {
+        "complies": true,
+        "present": {
+            "success": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "skipped": [],
+    "complies": true,
+    "show ip ospf neighbors detail": {
+        "complies": true,
+        "present": {
+            "192.168.100.11": {
+                "complies": true,
+                "nested": true
+            },
+            "192.168.100.12": {
+                "complies": true,
+                "nested": true
+            },
+            "192.168.100.22": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "show port-channel summary": {
+        "complies": true,
+        "present": {
+            "Port-channel1": {
+                "complies": true,
+                "nested": true
+            }
+        },
+        "missing": [],
+        "extra": []
+    },
+    "show vpc": {
+        "complies": true,
+        "present": {
+            "vpc_peer_keepalive_status": {
+                "complies": true,
+                "nested": false
+            },
+            "vpc_peer_status": {
+                "complies": true,
+                "nested": false
+            }
+        },
+        "missing": [],
+        "extra": []
+    }
+}

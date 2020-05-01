@@ -10,7 +10,8 @@ import yaml                                         #Import YAML from PyYAML
 script, yaml_input, jinja_template = argv
 
 #Loads data from YAML file into Python dictionary
-config = yaml.load(open(yaml_input))
+# config = yaml.load(open(yaml_input))
+config = yaml.load(open(yaml_input), Loader=yaml.FullLoader)
 
 #Loads the Jinja2 template
 env = Environment(loader=FileSystemLoader('./'), trim_blocks=True, lstrip_blocks=True)

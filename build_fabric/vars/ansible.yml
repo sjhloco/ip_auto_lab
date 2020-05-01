@@ -1,8 +1,13 @@
 ---
 ################ Login and Ansible settings (normally would be in all.yml) ################
+
 # Python location on the Ansible host (operating system specific)
 ansible_python_interpreter: "/usr/bin/env python"
+# Username and password uses by Ansible modules
+ansible_user: "{{ ans.creds_all.username }}"
+ansible_ssh_pass: "{{ ans.creds_all.password }}"
 
+# Non-ansible core variables used in playbook, so ones I can suffix ans. before
 ans:
   # Base directory Location to store the generated configuration snippets
   dir_path: ~/device_configs
@@ -18,3 +23,4 @@ ans:
     spine_os: nxos
     border_os: nxos
     leaf_os: nxos
+

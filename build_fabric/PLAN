@@ -1,22 +1,91 @@
-==== APPLY CONFIG ====
+3. Writeup README
 
-Fix MLAG interfaces, either make /30 or change ips as are 1 out (i.e 0 and 1 rather than 1 and 2)
-Add a flag to easily toggle on/off print diffs to screen
-Improve the tags
-Add a rolback play for NAPALM
-Add simple example Diagram for 2 sp, 2 bdr, 2 lf
+Get rid of genie and use |json
+Add regex for assmbel to match .cfg, or some way to stop assmebiling other things (use conf for base and fabric and match on that)
+
+
+
+2. Test th full script
+-Validation may need to be needs to be delayed
+
+4. Add playbook for netbox
 
 
 CHeck if can get any ideas from
 https://overlaid.net/2019/02/19/arista-bgp-evpn-ansible-lab/
 https://github.com/varnumd/ansible-arista-evpn-lab
 
-==== VALDIATE ====
-2. Add validation checks
--Validate input data is correct (addresses valid, follows naming formats, intergrars, etc), based on my compliance requirements
--Output is expected, compared to what expect from the input file
--Validate LLDP to check cabling correct, BGP peerings, what else???
+
+
+
 
 AT this point halfway through, evaluate as next need to add services
 
 
+==== README ===
+Min size of the fabric is 1 spine and 2 leafs.
+Must have equal number of borders or leafs, so 2, 4, etc
+
+naplam_val and nxos_val are Validating the state not the configuration
+
+Add simple example Diagram for 2 sp, 2 bdr, 2 lf
+
+=input_validate
+This is validating the data input, not what the playbook is doign with the data.
+It doesnt validate every single varible in the vars files, just the core things that will definately break the playbook functionality or fabric.
+
+Checks:
+-base.yml:
+bse.device_name: Ensures that the device names used match the correct format as that is heavily used in inventory script logic
+bse.addr: Ensures that the network addresses entered are valid networks (or IP for loopback) with the correct subnet mask
+
+fabric.yml
+fbc.network_size: Ensures the number of each type of device is within the limits and constraints
+fbc.ospf: Ensures that the OSPF process is present and area in dotted decimal format
+fbc.bgp.as_num: Ensures that the AS is present, cant make more specific incase is 2-byte or 4-byte ASNs
+fbc.acast_gw_mac: Ensures the anycast virtual MAC is a valid mac address
+fbc.adv.bse_intf: Ensures that the interface numbers are integrars
+fbc.adv.lp: Ensures all the loopback names are unique, no duplicates
+fbc.adv.mlag): Ensures all of MLAG paraemters are integers and VLANs within limit
+fbc.adv.addr_incre: Ensures all of the IP address increment values used are integers and except for mlag peering are all unique
+
+Maybe add MLAG
+
+Add note about file strucutre, is split int ofollowing:
+/home/ste/device_configs/
+├── DC1-N9K-LEAF01
+│   ├── config
+│   └── validate
+├── diff
+└── reports
+
+
+
+Maybe a few isdefined tests
+
+# fabric
+# - network)size is digit and not excedd limit, none of addr_incre are the same, none of loopbacks same, base int are decimal
+# - asnumber a digit and acast_gw_mac valid
+
+
+Add to README on how to run playbook
+pre_val       Checks var_file contents are valid conforming to script rules (naming, address format, integrar, size, etc)
+dir             Deletes directory and rectreates the file struture to save configs and playbook output
+
+bse             Generates the base configuration and saves it to file
+fbc             Generates the fabric configuration and saves it to file
+bse_fbc         Generates the base and fabric config snippets nd joins them
+
+cfg             Apply the configuration to devices (diffs saved to file)
+cfg_diff        Apply the config and print the differences to screen (also still saved to file)
+rb              Reverses the changes by applying the tollback configuration
+
+val_temp        Generates desired state validation files for napalm_validate and custom_validate
+nap_val         Generates validation file and runs generic napalm_validate to check LLDP, BGP and ping
+cus_val         Generates validation file and runs device type specific custom_validate checking OSPF, LAG and MLAG
+post_val        Runs nap_val and cus_val
+
+full             Runs everything except cfg_diff
+
+
+In checkmode the post validation tasks will not be run

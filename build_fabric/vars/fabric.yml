@@ -1,5 +1,6 @@
 ---
 ################ Variables used to decide how the fabric will look ################
+
 # This Only scales to 4 spines, 10 leafs, 4 borders. By default the following ports are used:
 # SPINE-to-LEAF = Eth1/1 - 1/10           SPINE-to-Border = Eth1/11 - 1/15
 # LEAF-to-SPINE = Eth1/1 - 1/5            BORDER-to-SPINE: = Eth1/1 - 1/5
@@ -8,19 +9,20 @@
 # How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in MLAG pair
 fbc:
   network_size:
-    num_spines: 2
-    num_borders: 2
-    num_leafs: 2
+    num_spines: 2                             # Can be 1 to 4
+    num_borders: 2                            # Can be 0, 2 or 4
+    num_leafs: 2                              # Can be 2, 4, 6, 8 or 10
 
 # To change Fabric routing protocol settings
   route:
     ospf:
-      pro: 'underlay'
-      area: 0.0.0.0
+      pro: 'underlay'                         # Can be numbered or named
+      area: 0.0.0.0                           # Must be in dotted decimal format
     bgp:
       as_num: 65001
 
-  acast_gw_mac: 0000.2222.3333
+  acast_gw_mac: 0000.2222.3333                # Must be in the format xxxx.xxxx.xxxx
+
 ################ Advanced settings to further customize the fabric ################
 
   adv:
@@ -61,5 +63,5 @@ fbc:
       border_mlag_lp: 56                      # Pair of BORDER MLAG shared loopback addresses (VIP) will be from .56 to .57
       leaf_mlag_lp: 51                        # Pair of LEAF MLAG shared loopback addresses (VIP) will be from .51 to .55
       border_bgw_lp: 58                       # Pair of BORDER BGW shared anycast loopback addresses will be from .58 to .59
-      mlag_leaf_ip: 1                         # Start IP for LEAF Peer Links, so LEAF1 is .1, LEAF2 .2, LEAF3 .3, etc
-      mlag_border_ip: 11                      # Start IP for BORDER Peer Links, so BORDER1 is .11, BORDER2 .12, etc
+      mlag_leaf_ip: 0                         # Start IP for LEAF Peer Links, so LEAF1 is .0, LEAF2 .1, LEAF3 .2, etc
+      mlag_border_ip: 10                      # Start IP for BORDER Peer Links, so BORDER1 is .10, BORDER2 .11, etc
