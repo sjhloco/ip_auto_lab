@@ -66,6 +66,32 @@ These core elements are the minimum requirements to create the declarative fabri
 - *mlag_leaf_ip: 0*               Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc
 - *mlag_border_ip: 10*          Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc
 
+Before any tasks are run input data from the variable files is validated to ensure it is of the correct format and meets the rules of playbook (number of devices, addresisng format, etc). It doesnt validate every single variable in the var files, just the core things that will definately break the playbook functionality or fabric.
+
+Validates the core fabric variables in the base and fabric files are of the correct
+format to be able to run the playbook and build a fabric.
+A pass or fail is returned to the Ansible Assert module, if it fails the full output is also
+returned for the failure message. The following methods check:
+
+## Directory Structure
+By default the following directory structure is created within *~/device_configs*, this base location can be changed using *ans.dir_path*.
+
+```bash
+~/device_configs/
+├── DC1-N9K-BORDER01
+│   ├── config
+│   │   ├── base.conf
+│   │   ├── config.conf
+│   │   └── fabric.cfg
+│   └── validate
+│       ├── napalm_desired_state.yml
+│       └── nxos_desired_state.yml
+├── diff
+│   ├── DC1-N9K-BORDER01.txt
+└── reports
+    ├── DC1-N9K-BORDER01_fbc_compliance_report.json
+'''
+
 ## Installation and Prerequisites
 
 It using a vir env change the NAPLAM library and plugin locations in the *ansible.cfg* to match your environment
