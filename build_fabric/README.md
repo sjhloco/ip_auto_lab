@@ -1,9 +1,9 @@
 # Deploy Leaf and Spine
 
-The idea behind this playbook is to deploy a leaf and spine architecture and its related services in a declarative manner. You only have to define a few key values such as naming convention, number of devices and addresses ranges and the playbook will do the rest.
+This playbook will deploy a leaf and spine fabric and its related services in a declarative manner. You only have to define a few key values such as *naming convention*, *number of devices* and *addresses ranges*, the playbook will do the rest.
 If you wish to have a more custom build the majority of the elements (unless specifically stated) in the variable files can be changed as none of the scripting or templating logic uses the actual contents to make decisions.
 
-This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
+This deployment will only scale upto 4 spines, 4 borders and 10 leafs. At a minimum must have 1 spine, 2 leafs, with the leafs and broders needing to even numbers. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
 
 - SPINE-to-LEAF: Eth1/1 - 1/10
 - SPINE-to-BORDER: Eth1/11 - 1/15
@@ -13,15 +13,14 @@ This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By defaul
 
 ## Dynamic Inventory
 
-A custom inventory plugin is used to create the dynamic inventory and *host_vars* of all the interfaces and IP addresses needed for the fabric. By doing this in the inventory it abstracts the complexity from the *base* and *fabric* templates keeping them clean and simple meaking it much easier to expand this playbook build templates for other brands.
-Loopbacks are a stored in list of dictionaries so the dict values (ip and intf) can easily be referenced whereas interfaces are a dictionary as they have no IP address so only need to be looped over to create the interfaces.
+A custom inventory plugin is used to create the dynamic inventory and *host_vars* of all the interfaces and IP addresses needed for the fabric. By doing this in the inventory it abstracts the complexity from the *base* and *fabric* templates keeping them clean and simple which makes it easier to expand this playbook build templates for other brands.
 
 When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.
 
 ```bash
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --graph
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list
-ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml -host=DC1-N9K-SPINE01
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                 To run against a playbook
 ```
 
