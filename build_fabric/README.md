@@ -55,20 +55,20 @@ These core elements are the minimum requirements to create the declarative fabri
 
 *address_incre:* Increment that is added to the subnet and device hostname number to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
-- *spine_ip: 11*.                     Spine mgmt IP and routing loopback addresses will be from .11 to .14
-- *border_ip: 16*                   Border mgmt IP and routing loopback addresses will be from .16 to .19
-- *leaf_ip: 21*                         Leaf mgmt IP and routing loopback addresses will be from .21 to .30
-- *border_vtep_lp: 36*   Border VTEP loopback addresses will be from .36 to .39
-- *leaf_vtep_lp: 41*   Leaf VTEP loopback addresses will be from .41 to .50
-- *border_mlag_lp: 56*   Pair of border shared loopback addresses (VIP) will be from .56 to .57
-- *leaf_mlag_lp: 51*   Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
-- *border_bgw_lp: 58*   Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
-- *mlag_leaf_ip: 0*  Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 .1, LEAF3 .2, etc
-- *mlag_border_ip: 10*   Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 .11, etc
+- *spine_ip: 11*.                       Spine mgmt IP and routing loopback addresses will be from .11 to .14
+- *border_ip: 16*                     Border mgmt IP and routing loopback addresses will be from .16 to .19
+- *leaf_ip: 21*                           Leaf mgmt IP and routing loopback addresses will be from .21 to .30
+- *border_vtep_lp: 36*           Border VTEP loopback addresses will be from .36 to .39
+- *leaf_vtep_lp: 41*                 Leaf VTEP loopback addresses will be from .41 to .50
+- *border_mlag_lp: 56*         Pair of border shared loopback addresses (VIP) will be from .56 to .57
+- *leaf_mlag_lp: 51*               Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
+- *border_bgw_lp: 58*            Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
+- *mlag_leaf_ip: 0*               Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc
+- *mlag_border_ip: 10*          Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc
 
 ## Installation and Prerequisites
 
-It you are using a virtual environment change the NAPLAM library and plugin locations in the *ansible.cfg* to match your environment
+It using a vir env change the NAPLAM library and plugin locations in the *ansible.cfg* to match your environment
 
 ```bash
 library = /home/ste/virt/ansible_2.8.4/lib/python3.6/site-packages/napalm_ansible/modules
@@ -76,8 +76,8 @@ action_plugins = /home/ste/virt/ansible_2.8.4/lib/python3.6/site-packages/napalm
 ```
 
 The following base configuration needs to be manually added on all the devices.\
-Features *nxapi* and *scp-server* are required for NAPALM config_replace and nxapi vrf would break the NAPALM session so is done beforehand.
-Image validation can take overa while on vNXOS so is best to do beforehand.
+Features *nxapi* and *scp-server* are required for NAPALM config_replace so are needed done beforehand.
+Image validation can take a while on vNXOS so it is also best to do beforehand.
 
 ```bash
 interface mgmt0
@@ -90,7 +90,7 @@ feature scp-server
 boot nxos bootflash:/nxos.9.2.4.bin
 ```
 
-Can optionally run the *ssh_key_playbook.yml* script to automatically add all the new devices SSH keys to the *~/.ssh/known_hosts* file on the ansible host. You first need to install ssh-keygen and added the device IPs to the *ssh_hosts* file.
+Optionally run *ssh_key_playbook.yml* to automatically add all the new devices SSH keys to the *~/.ssh/known_hosts* file on the ansible host. Before running added the device IPs to the *ssh_hosts* file. and install *ssh-keygen*. 
 
 ```bash
 sudo apt install ssh-keyscan
