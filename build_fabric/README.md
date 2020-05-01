@@ -90,11 +90,11 @@ By default the following directory structure is created within *~/device_configs
 │   ├── DC1-N9K-BORDER01.txt
 └── reports
     ├── DC1-N9K-BORDER01_fbc_compliance_report.json
-'''
+```
 
 ## Installation and Prerequisites
 
-It using a vir env change the NAPLAM library and plugin locations in the *ansible.cfg* to match your environment
+It using a virtual env change the NAPLAM library and plugin locations in the *ansible.cfg* to match your environment.
 
 ```bash
 library = /home/ste/virt/ansible_2.8.4/lib/python3.6/site-packages/napalm_ansible/modules
@@ -102,8 +102,8 @@ action_plugins = /home/ste/virt/ansible_2.8.4/lib/python3.6/site-packages/napalm
 ```
 
 The following base configuration needs to be manually added on all the devices.\
-Features *nxapi* and *scp-server* are required for NAPALM config_replace so are needed done beforehand.
-Image validation can take a while on vNXOS so it is also best to do beforehand.
+Features *nxapi* and *scp-server* are required for Naplam *config_replace* so must be enabled beforehand.\
+Image validation can take a while on vNXOS so it is also best to do so beforehand.
 
 ```bash
 interface mgmt0
@@ -116,7 +116,7 @@ feature scp-server
 boot nxos bootflash:/nxos.9.2.4.bin
 ```
 
-Optionally run *ssh_key_playbook.yml* to automatically add all the new devices SSH keys to the *~/.ssh/known_hosts* file on the ansible host. Before running added the device IPs to the *ssh_hosts* file. and install *ssh-keygen*. 
+Optionally run *ssh_key_playbook.yml* to automatically add all the new devices SSH keys to the *~/.ssh/known_hosts* file on the ansible host. Before running add the device IPs to the *ssh_hosts* file and install *ssh-keygen*. 
 
 ```bash
 sudo apt install ssh-keyscan
@@ -125,10 +125,27 @@ ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 
 ## Running playbook
 
-When the playbook runs it creates the *device_configs* folder in your home directory and wihin here a directory for each device that stores the *base.cfg* and *fabric.cfg* which are then joined together using *assemble*. A *device_configs/diff* folder is also created that stores the differences for each device in seperate device files in the format *device_name.cfg*.
-NAPALM *commit_changes* is set to *True* so use Ansible *check_mode* to do a dry run.
-Wihtin the diff folder the config differences for each device are stored in file wiht the devices name.
-Commit changes is always set to true, usee Ansible check mode to deide whetehr do or not
+The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in *diff*) and optionally printed to screen.\
+Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is used for dry-runs.
+
+**--pre_val**       Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
+**--dir**          Deletes and recreates the file struture to save configs, diffs and reports
+
+**--bse**            Generates the base configuration snippet and saves it to file\
+**--fbc**            Generates the fabric configuration snippet and saves it to file\
+**--bse_fbc**            Generates the base and fabric config snippets and joins them together\
+
+**--cfg**             Apply the configuration to devices (diffs saved to file)\
+**--cfg_diff**        Apply the config and print the differences to screen (also still saved to file)\
+**--rb**              Reverses the changes by applying the tollback configuration\
+
+**--val_temp**        Generates desired state validation files for napalm_validate and custom_validate\
+**--nap_val**         Generates validation file and runs generic napalm_validate to check LLDP, BGP and ping\
+**--cus_val**         Generates validation file and runs device type specific custom_validate checking OSPF, LAG and MLAG\
+**--post_val**        Runs nap_val and cus_val
+
+full             Runs everything except cfg_diff
+
 
 ```bash
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
