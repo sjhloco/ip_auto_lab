@@ -164,10 +164,10 @@ cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python
 1. Add simple diagram
 2. Remove genie from it and instead use | json so more generic
 3. Change extentsion of base.cfg and fabric.cfg to conf and add rule so assemble will never join itself
-4. Create seperate playbook to pdate Netbox with information used to build the fabric
+4. Create seperate playbook to update Netbox with information used to build the fabric
 5. Add services s config replace
 6. Add services as seperate playbook that is merge
 
 Nice to have
-1. Add fabric vPC (dont thin kpossible) and multisite
+1. Add fabric vPC (dont think possible) and multisite
 2. Add templates for Arista
