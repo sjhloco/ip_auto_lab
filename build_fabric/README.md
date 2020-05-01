@@ -18,11 +18,12 @@ A custom inventory plugin is used to create the dynamic inventory and *host_vars
 When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.
 
 ```bash
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph          The see group members
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01       To see a hosts host_vars
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list           View all devices and host_vars
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01     Hosts attributes
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph          Groups and members
 
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            To run against a playbook
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list           All devices and host_vars
+
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            Run against a playbook
 ```
 
 ## Core variable Elements
