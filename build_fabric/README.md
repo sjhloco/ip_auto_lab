@@ -11,6 +11,8 @@ This deployment will only scale upto 4 spines, 4 borders and 10 leafs. At a mini
 - BORDER-to-SPINE: Eth1/1 - 1/5
 - VPC Peer-link: Eth1/127 - 128
 
+==ADD A DIAGRAM==
+
 ## Dynamic Inventory
 
 A custom inventory plugin is used to create the dynamic inventory and *host_vars* of all the interfaces and IP addresses needed for the fabric. By doing this in the inventory it abstracts the complexity from the *base* and *fabric* templates keeping them clean and simple which makes it easier to expand this playbook build templates for other brands.
@@ -18,27 +20,26 @@ A custom inventory plugin is used to create the dynamic inventory and *host_vars
 When not running the inventory pluggin against a playbook you have to use *ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins)* or you could probably set as env var or in config file.
 
 ```bash
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01     Hosts attributes
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01     Host attributes
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph          Groups and members
-
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list           All devices and host_vars
-
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            Run against a playbook
 ```
 
 ## Core variable Elements
 
-These core elements are the minimun requirements to create the declarative fabric. They are used for dynamic inventory creation as well as in some part by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easy to identify within the templates which variable file they came from.
+These core elements are the minimum requirements to create the declarative fabric. They are used for dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the templates which variable file the variable came from.
 
 **ansible.yml**\
 *device_type:* Operating system of each device type (Spine, Leaf and Border)
+*creds_all:* Hostname, username and password
 
 **base.yml**\
-*device_name:* The naming format that the automatically generated node number is added to in double decimal format (0x). The start of the name can be changed, but the last hyphen and name after it (SPINE, BORDER or LEAF) must not be changed the as that is what is used in the scripting logic to generate the Ansible groups.
+*device_name:* The naming format that the automatically generated node ID is added to (double decimal format 0x) and the group name created from. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore as this is used as the group name.
 
-- spine_name: 'xx-SPINE'
-- border_name: 'xx-BORDER'
-- leaf_name: 'xx-LEAF'
+- spine_name: 'xx-xx'
+- border_name: 'xx-xx'
+- leaf_name: 'xx-xx'
 
 *addr:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
 
