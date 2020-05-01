@@ -128,23 +128,23 @@ ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in *diff*) and optionally printed to screen.\
 Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is used for dry-runs.
 
-**--pre_val**       Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
-**--dir**          Deletes and recreates the file struture to save configs, diffs and reports
+**--pre_val**             Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
+**--dir**                  Deletes and recreates the file struture to save configs, diffs and reports
 
-**--bse**            Generates the base configuration snippet and saves it to file\
-**--fbc**            Generates the fabric configuration snippet and saves it to file\
+**--bse**               Generates the base configuration snippet and saves it to file\
+**--fbc**                Generates the fabric configuration snippet and saves it to file\
 **--bse_fbc**            Generates the base and fabric config snippets and joins them together\
 
-**--cfg**             Apply the configuration to devices (diffs saved to file)\
-**--cfg_diff**        Apply the config and print the differences to screen (also still saved to file)\
-**--rb**              Reverses the changes by applying the tollback configuration\
+**--cfg**            Apply the configuration to devices (diffs are saved to file)\
+**--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
+**--rb**              Reverses the changes by applying the rollback configuration\
 
-**--val_temp**        Generates desired state validation files for napalm_validate and custom_validate\
-**--nap_val**         Generates validation file and runs generic napalm_validate to check LLDP, BGP and ping\
-**--cus_val**         Generates validation file and runs device type specific custom_validate checking OSPF, LAG and MLAG\
-**--post_val**        Runs nap_val and cus_val
+**--val_temp**        Generates desired state validation files for *napalm_validate* and *custom_validate*\
+**--nap_val**        Generates validation file and runs generic *napalm_validate* to check LLDP, BGP and ping\
+**--cus_val**        Generates validation file and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
+**--post_val**        Runs nap_val and cus_val
 
-full             Runs everything except cfg_diff
+**--full**           Runs everything except cfg_diff
 
 
 ```bash
