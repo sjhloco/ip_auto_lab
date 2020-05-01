@@ -125,14 +125,14 @@ ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 
 ## Running playbook
 
-The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in *diff*) and optionally printed to screen.\
+The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in */device_configs/diff*) and optionally printed to screen.\
 Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is used for dry-runs.
 
 **--pre_val**             Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
 **--dir**                    Deletes and recreates the file struture to save configs, diffs and reports
 
 **--bse**                 Generates the base configuration snippet and saves it to file\
-**--fbc**                  Generates the fabric configuration snippet and saves it to file\
+**--fbc**                    Generates the fabric configuration snippet and saves it to file\
 **--bse_fbc**          Generates the base and fabric config snippets and joins them together\
 
 **--cfg**                  Apply the configuration to devices (diffs are saved to file)\
@@ -144,57 +144,30 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--cus_val**           Generates validation file and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
 **--post_val**         Runs nap_val and cus_val
 
-**--full**                Runs everything except cfg_diff
+**--full**                  Runs everything except cfg_diff
 
-
+If the playbook is run in check-mode the post_validation tasks will not be run.
 ```bash
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir,base,fabric,config" -C
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full, cfg_diff" -C
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 ```
 
-## Caveats
+## Post Validation checks
 
-The following caveats cameout of building templates for NXOS config_replace:\
-*feature interface-vlan* &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;    Need to make sure also have *interface vlan1* in your config file\
-*logging source-interface loopback1* &emsp;&emsp;&emsp;  Order specifc so the loopback intefrace must be before it in the template
+Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired satte and actual state files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
 
-The following lines to need to be at the top of the config_replace template:\
-*!Command: Checkpoint cmd vdc 1* &emsp;&emsp;&emsp;  The nexus wont recognise candidate_config.txt as a checkpoint file without it\
-*version 9.2(4) Bios:version* &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;  Without it does "no hostname" which causes a failure due to 'Syntax error while parsing 'vdc DC1-N9K-LEAF01 id 1'
-
-If configuration application fails the following cmds are useful to tshoot on the NXOS device:\
-*show account log* &emsp;&emsp;&emsp;&emsp;  See the cmds run by NAPALM\
-*show rollback status* &emsp;&emsp;&emsp;  Check whether the install failed or not, sometimes NAPALM session can close or timeout but the config still be applied
-*show rollback log exec* &emsp;&emsp;&emsp;  Show the cmds run, can workout from this what cmd caused it to fail
-
-If the install fails the files will be left on the NXOS so you can manually attempt the change.\
-*show diff rollback-patch file sot_file file canadiate* &emsp;&emsp;&emsp;&emsp;  Check the config difference on the device\
-*rollback running-config file candidate_config.txt verbose* &emsp;&emsp;&emsp;  Manually do the config_replace, verbose shows \cmds entered
-*rollback running-config file rollback_config.txt* &emsp;&emsp;&emsp;  To rollback the config changes
+```bash
+cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
+```
 
 ## Notes and Improvements
+1. Add simple diagram\
+2. Remove genie from it and instead use | json so more generic\
+3. Change extentsion of base.cfg and fabric.cfg to conf and add rule so assemble will never join itself\
+4. Create seperate playbook to pdate Netbox with information used to build the fabric\
+5. Add services s config replace\
+6. Add services as seperate playbook that is merge\
 
-Tested on lab of 6 devices running code 9.2(4)
-
-1. Improvemtns to current version\
-Fix MLAG interfaces, either make /30 or change ips as are 1 out (i.e 0 and 1 rather than 1 and 2)\
-Add a flag to easily toggle on/off print diffs to screen\
-Improve the tags\
-Add a rolback play for NAPALM\
-Add simple example Diagram for 2 sp, 2 bdr, 2 lf
-
-2. Add validation checks\
--Validate input data is correct (addresses valid, follows naming formats, intergrars, etc), based on my compliance requirements\
--Output is expected, compared to what expect from the input file\
--Validate LLDP to check cabling correct, BGP peerings, what else???\
-
-3. Update Netbox with information used to build the fabric
-
-4. Redo services data models and add:\
-Remove complexity from the templates, put into jinja2 filters isntead\
-Have options to deploy as replace config or as merge config. Maybe sperate playbooks?\
-Validation checks for services
-
-5. Nice to have\
-Add fabric vPC and multisite\
-Add templates for Arista
+Nice to have\
+1. Add fabric vPC (dont thin kpossible) and multisite\
+2. Add templates for Arista
