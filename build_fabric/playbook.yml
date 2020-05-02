@@ -2,8 +2,7 @@
 # This playbook is used to to deploy leaf and spine topology
 
 - name: "Deploy Leaf and Spine DC"
-  # hosts: all
-  hosts: DC1-N9K-LEAF01
+  hosts: all
   connection: local
   vars_files:
     - vars/ansible.yml            # All varaibles start with ans.
@@ -28,7 +27,7 @@
           quiet: yes
           fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
                       fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
-      run_once: true
+      run_once: true        # Doesnt need to run for every hosts as just validating files.
       tags: [pre_val, full]
     # 1b. Create the file structure
     - name: "Create the localhost environment"
@@ -37,7 +36,8 @@
         file:
           path: "{{ ans.dir_path }}"
           state: absent
-          force: yes
+        run_once: true        # Only needs to run for one host as delets the root directory
+        # ignore_errors: yes  # Needed as for some reason errors trying to remove directories even though were removed
         changed_when: False
       - name: "SYS >> Creating file structure"
         file: path="{{ ans.dir_path }}/{{ item }}" state=directory
@@ -72,7 +72,7 @@
         # NXOS takes between 70 to 100 seconds to deploy all changes so defaul timesout needed increasing
         timeout: 120
         config_file: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/config.cfg"
-        commit_changes: True            # Set to true as use Anisble checkmode to do dry runs
+        commit_changes: True            # Set to true as use Ansible check_mode to do dry runs
         replace_config: True            # Replacing config rather than merging
         diff_file: "{{ ans.dir_path }}/diff/{{ inventory_hostname }}.txt"
         get_diffs: True                 # All diffs re save to file, can user with checkmode to see expected
@@ -92,9 +92,9 @@
       - napalm_install_config:
           provider: "{{ ans.creds_all }}"
           dev_os: "{{ ansible_network_os }}"
-          #  timeout: 120                   ###### Not sure if it will need longer, dont think so
+          timeout: 120                    # Needed as with default 60 will timeout before full rollback complete
           config_file: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/rollback_config.txt"
-          commit_changes: True            # Set to true as use Anisble checkmode to do dry runs
+          commit_changes: True            # Set to true as use Ansible check_mode to do dry runs
           replace_config: True            # Replacing config rather than merging
           diff_file: "{{ ans.dir_path }}/diff/{{ inventory_hostname }}_rollback.txt"
           get_diffs: True
@@ -107,6 +107,11 @@
 # None of the validation tasks will run if it is in check-mode, although building the template file will be run
 
   post_tasks:
+    - name: SYS >> Waiting 10 seconds for convergence before runnning post_tasks
+      wait_for:
+        timeout: 10
+      run_once: true
+      tags: [full]
     - name: Import napalm_validate tasks to compare actual vs desired state
       import_role:
         name: fbc_validate
@@ -117,20 +122,3 @@
         name: fbc_validate
         tasks_from: custom
       tags: [cus_val, post_val, full]
-
-
-    - name: "Create {{ ansible_network_os }} compliance report"
-      block:
-    #   # Loads the variable file and the genie parser role
-      - include_vars: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
-      - name: "NET >> Validating OSPF, Port-channels and VPC"
-      # Generates actual_state using napalm_cli
-        napalm_cli:
-          provider: "{{ ans.creds_all }}"
-          dev_os: "{{ ansible_network_os }}"
-          args:
-            commands:
-              - "show port-channel summary"
-        register: test
-      - debug: var=test.cli_results
-      tags: test

@@ -29,7 +29,7 @@
           is_up: true
 {% endfor %} {% endif %}
 
-{##### Gets all loopback addresses from host_vars, takes for ever so dont ping RTR (tested by BGP & OSPF) or BGW (not used) #####}
+{##### Gets all loopback addresses from host_vars. Disabled as takes too long #####}
 {# {% for x in groups['all'] %}
 - ping:
     _name: ping RTR loopback {{ x }}
@@ -39,7 +39,7 @@
     success:
       packet_loss: 0
     _mode: strict
-{% endfor %} #}
+{% endfor %}
 {% for x in groups[bse.device_name.leaf.split('-')[-1].lower()] + groups[bse.device_name.border.split('-')[-1].lower()] %}
 - ping:
     _name: ping VTEP loopback {{ x }}
@@ -58,7 +58,7 @@
       packet_loss: 0
     _mode: strict
 {% endfor %}
-{# {% for x in groups['border'] %}
+{% for x in groups['border'] %}
 - ping:
     _name: ping BGW loopback: {{ x }}
     _kwargs:
