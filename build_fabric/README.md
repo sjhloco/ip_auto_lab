@@ -162,13 +162,13 @@ cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python
 The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
 
 ## Notes and Improvements
+Have disabled ping from the napalm valdiation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
+
 1. Add simple diagram
-2. Remove genie from it and instead use | json so more generic
-3. Change extentsion of base.cfg and fabric.cfg to conf and add rule so assemble will never join itself
-4. Create seperate playbook to update Netbox with information used to build the fabric
-5. Add services s config replace
-6. Add services as seperate playbook that is merge
+2. Add servicess config replace
+3. Add services as seperate playbook that is merge
 
 Nice to have
+1. Create a seperate playbook to update Netbox with information used to build the fabric
 1. Add fabric vPC (dont think possible) and multisite
 2. Add templates for Arista
