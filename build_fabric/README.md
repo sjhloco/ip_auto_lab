@@ -154,11 +154,12 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 
 ## Post Validation checks
 
-Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired satte and actual state files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
+Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
 
 ```bash
 cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
 ```
+The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
 
 ## Notes and Improvements
 1. Add simple diagram
