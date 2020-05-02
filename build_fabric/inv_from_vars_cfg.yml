@@ -1,7 +1,7 @@
 ### the inventory config file that is referneced in playbook runs to run the inventory pluggin ###
 
 # To just run the inventory pluggin to generate the host_vars and group_vars that are printed to screen:
-# ANSIBLE_INVENTORY_PLUGINS=$(pwd inventory_plugins) ansible-inventory -i inv_from_vars_cfg.yml --list
+# ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list
 
 # Name of the inventory pluggin (stored in the inventory_plugins directory)
 plugin: inv_from_vars

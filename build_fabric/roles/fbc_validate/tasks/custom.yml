@@ -14,9 +14,8 @@
 # 4b. CUSTOM: napalm_cli gets the actual state and custmised version of napalm_validate used to compare and report
 - name: "Create {{ ansible_network_os }} compliance report"
   block:
-  # Loads the variable file and the genie parser role
+#   # Loads the variable file and the genie parser role
   - include_vars: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
-  - include_role: name=clay584.parse_genie          # !!!! Should change to collections on Ansible 2.9
   - name: "NET >> Validating OSPF, Port-channels and VPC"
   # Generates actual_state using napalm_cli
     napalm_cli:
@@ -24,7 +23,7 @@
       dev_os: "{{ ansible_network_os }}"
       args:
         commands:
-          - "{{ item.keys() | list | first }}"
+          - "{{ item.keys() | list | first }} | json"
     register: output
     # Loops through the cmds to run and uses label to print the cmd run each loop iteration
     loop: "{{ cmds }}"
@@ -34,8 +33,8 @@
 # 4c. REPORT: Output is parsed into data model and then passed through custom_validate pluggin to compare states and generate a report
   - assert:
   # Only True or False is returned to Assert module. The compliance report is added to the napalm_validate generated report
-      that: "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first | parse_genie(command=item.cli_results.keys() |
-             list | first, os='nxos'), ans.dir_path, inventory_hostname) }} == 'custom_validate passed'"
+      that: "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, ans.dir_path,
+             inventory_hostname, ansible_network_os) }} == 'custom_validate passed'"
       quiet: yes
       fail_msg: "Non-compliant state encountered. Refer to the full report in {{ ans.dir_path }}/reports/"
     loop: "{{ output.results }}"
@@ -43,5 +42,18 @@
       label: "{{ item.cli_results.keys() | list | first }}"
       index_var: lp_idx
   when: not ansible_check_mode          # Dont want to run validation in check_mode
+
+
+
+# TSHOOT: Used to print out what you get from custom_validate when thsooting, still need to change return output in custom_validate
+# - name: "Create {{ ansible_network_os }} compliance report"
+#   block:
+#   - set_fact:
+#       test:  "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, ans.dir_path, inventory_hostname, ansible_network_os) }}"
+#     loop: "{{ output.results }}"
+#     loop_control:
+#       label: "{{ item.cli_results.keys() | list | first }}"
+#       index_var: lp_idx
+#   - debug: var=test
 
 

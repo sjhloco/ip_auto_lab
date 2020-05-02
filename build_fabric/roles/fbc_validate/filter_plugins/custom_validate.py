@@ -1,14 +1,18 @@
 """ Generates compliance reports using napalm_validate with an input file of the actual state
-rather than naplam_validate state to allow the vlidation of features that dont have naplam_getters
+rather than naplam_validate state to allow the vlidation of features that dont have naplam_getters.
+As cant use varaibles for Ansible filter plugin names has device specific methods that are called
+by the main method (engine);
 
 Methods:
 -compliance_report: Replaces the compliance_report method with this custom one that still runs
-validate.compare but with expected state and actual state yaml files
--custom_validate: Formats the data recieved from the device (parsed by PYats genie) into the same
-format as the expected state yaml file for napalm_validate to then run complaince check on
+validate.compare but with desired state and actual state yaml files
+-custom_validate: CRuns the OS specific methods and passes the returned DM through napalm_validate
+to create a omplaince report
+-xxx_dm: Formats the data recieved from the device into the same format as the desired state yaml file.
+Will have different methods for different OS types.
 -fix_home_path: Converts ~/ to full path for naplm_vaidate and compliance_report as dont recognise
 
-A pass or fail is returned to the Ansibel Assert module, as well as the compliance report joined to
+A pass or fail is returned to the Ansible Assert module, as well as the compliance report joined to
 the napalm_validate complaince report
 """
 
@@ -22,17 +26,26 @@ import re
 class FilterModule(object):
     def filters(self):
         return {
-            'custom_validate': self.custom_validate,
             'fix_home_path': self.fix_home_path,
+            'custom_validate': self.custom_validate,
         }
 
-    # REPORT: Uses naplam_validate on custom data fed into it (still supports '_mode: strict') to validate and create reports
-    def compliance_report(self, expected_state, actual_state, directory, hostname):
+    # FIX: napalm_validate doesnt recognise ~/ for home drive, also used in report method
+    def fix_home_path(self, input_path):
+        if re.match('^~/', input_path):
+            return os.path.expanduser(input_path)
+        else:
+            return input_path
+
+############################################ Method to run napalm_validate ############################################
+# REPORT: Uses naplam_validate on custom data fed into it (still supports '_mode: strict') to validate and create reports
+
+    def compliance_report(self, desired_state, actual_state, directory, hostname):
         report = {}
-        for cmd, expected_results in expected_state.items():
+        for cmd, desired_results in desired_state.items():
             key = cmd
             try:                # Feeds files into napalm_validate
-                report[key] = validate.compare(expected_results, actual_state)
+                report[key] = validate.compare(desired_results, actual_state)
             except NotImplementedError:
                 report[key] = {"skipped": True, "reason": "NotImplemented"}
 
@@ -50,44 +63,59 @@ class FilterModule(object):
         existing_report.update(report)
         with open(filename, 'w') as file_content:
             json.dump(existing_report, file_content)
+
         return report
 
-    # PROCESS: Formats the actual state into data models to pass through the reporting function
-    def custom_validate(self, expected_state, output, directory, hostname):
+############################################ Engine for custom_validate ############################################
+# ENGINE: Runs OS specific method to get data model, puts it through napalm_validate and then repsonds to Ansible
+
+    def custom_validate(self, desired_state, output, directory, hostname, os):
+        json_output = json.loads(output)     # Output comes in as serilaised json (long sting), needs making into json
         actual_state = {}
 
-        # OSPF: Creates a dictionary from the device output to match the format of the validation file
-        if list(expected_state.keys())[0] == "show ip ospf neighbors detail":
-            for intf in output['vrf']['default']['address_family']['ipv4']['instance']['underlay']['areas']['0.0.0.0']['interfaces'].values():
-                for nhbr in intf['neighbors'].values():
-                    actual_state[nhbr['neighbor_router_id']] = {'state': nhbr['state']}
-        # PO: Creates a dictionary from the device output to match the format of the validation file
-        elif list(expected_state.keys())[0] == "show port-channel summary":
-            actual_state = defaultdict(dict)
-            for po_dict in output.values():
-                for po, po_details in po_dict.items():
-                    actual_state[po]['oper_status'] = po_details['oper_status']
-                    actual_state[po]['members'] = po_details['members']
-        # VDC: Creates a dictionary from the device output to match the format of the validation file
-        elif list(expected_state.keys())[0] == "show vpc":
-            actual_state['vpc_peer_keepalive_status'] = output['vpc_peer_keepalive_status']
-            actual_state['vpc_peer_status'] = output['vpc_peer_status']
+        # Runs the OS specific method
+        if os == 'nxos':
+            actual_state = self.nxos_dm(desired_state, json_output, actual_state)
 
         # Feeds the validation file and new data model through the reporting function
-        result = self.compliance_report(expected_state, actual_state, directory, hostname)
+        result = self.compliance_report(desired_state, actual_state, directory, hostname)
         # Only the compliance report outcome is sent to Ansible Assert module, not the full report.
         if result["complies"] == True:
             return "'custom_validate passed'"
         else:
             return "'custom_validate failed'"
-        # return result["complies"]
-    # FIX: napalm_validate doesnt recognise ~/ for home drive, also used in report method
-    def fix_home_path(self, input_path):
-        if re.match('^~/', input_path):
-            return os.path.expanduser(input_path)
-        else:
-            return input_path
+
+        # return actual_state       # For tshooting
 
 
+############################################ OS data-model generators ############################################
+# NXOS: Formats the actual_state into data models to return to the engine that then passes it through the reporting method
 
+    def nxos_dm(self, desired_state, json_output, actual_state):
+        # OSPF: Creates a dictionary from the device output to match the format of the validation file
+        if list(desired_state.keys())[0] == "show ip ospf neighbors detail":
+            for nhbr in json_output['TABLE_ctx']['ROW_ctx']['TABLE_nbr']['ROW_nbr']:
+                actual_state[nhbr['rid']] = {'state': nhbr['state']}
 
+        # PO: Creates a dictionary from the device output to match the format of the validation file
+        elif list(desired_state.keys())[0] == "show port-channel summary":
+            actual_state = defaultdict(dict)
+            # Required due to shit NXOS JSON making dict rather than lisy if only 1 Po
+            if isinstance(json_output['TABLE_channel']['ROW_channel'], dict):
+                json_output['TABLE_channel']['ROW_channel'] = [json_output['TABLE_channel']['ROW_channel']]
+            for po in json_output['TABLE_channel']['ROW_channel']:
+                actual_state[po['port-channel'].capitalize()]['oper_status'] = po['status']
+                po_mbrs = {}
+                # Required due to shit NXOS JSON not adding blank fields if no members
+                if len(po) == 7:
+                    for mbr in po['TABLE_member']['ROW_member']:
+                        # Creates dict of members to add to as value in the PO dictionary
+                        po_mbrs[mbr['port']] = {'mbr_status': mbr['port-status']}
+                actual_state[po['port-channel'].capitalize()]['members'] = po_mbrs
+
+        # VDC: Creates a dictionary from the device output to match the format of the validation file
+        elif list(desired_state.keys())[0] == "show vpc":
+            actual_state['vpc_peer_keepalive_status'] = json_output['vpc-peer-keepalive-status']
+            actual_state['vpc_peer_status'] = json_output['vpc-peer-status']
+
+        return actual_state

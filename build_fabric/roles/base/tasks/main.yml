@@ -4,7 +4,7 @@
 - name: "SYS >> Generating base config snippets"
   template:
     src: "{{ ansible_network_os }}/base_template.j2"
-    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/base.cfg"
+    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/base.conf"
   changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False             # These tasks still make changes when in check mode
   tags: [bse, bse_fbc, full]

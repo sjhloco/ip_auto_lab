@@ -108,12 +108,12 @@ router bgp {{ fbc.route.bgp.as_num }}
 {% endif %}
 {% if bse.device_name.spine in inventory_hostname %}
 {# loop through the leaf and border groups and get loopback hostvar #}
-{% for dvc in groups['leaf'] + groups['border'] %}
+{% for dvc in groups[bse.device_name.leaf.split('-')[-1].lower()] + groups[bse.device_name.border.split('-')[-1].lower()] %}
   neighbor {{ hostvars[dvc]['intf_lp'][0]['ip'] |ipaddr('address') }}
     description {{ dvc }}
     inherit peer fabric_peering
 {% endfor %} {% else %}
-{% for sp in groups['spine'] %}
+{% for sp in groups[bse.device_name.spine.split('-')[-1].lower()] %}
   neighbor {{ hostvars[sp]['intf_lp'][0]['ip'] |ipaddr('address') }}
     description {{ sp }}
     inherit peer fabric_peering

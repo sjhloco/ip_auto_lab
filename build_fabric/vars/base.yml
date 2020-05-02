@@ -3,7 +3,7 @@
 
 # The naming structure that is added before the automatically generated node number (0x). Groups are created based on the name (i.e spine, border, leaf)
 bse:
-  device_name:                          # The start (DC1-N9K) can be changed, however the rest must NOT be chaneged as is used in the scritping logic
+  device_name:    # Must contain - and characters after - must be either letters, digits or underscore as this is used as the group name
     spine: 'DC1-N9K-SPINE'
     border: 'DC1-N9K-BORDER'
     leaf: 'DC1-N9K-LEAF'

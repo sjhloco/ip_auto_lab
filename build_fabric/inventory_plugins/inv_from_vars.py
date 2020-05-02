@@ -205,16 +205,16 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         for gr in groups:
             self.inventory.add_group(gr)
             # Creates the host entries, os and mlag_lp_addr host_var (although assigned to group in the cmd)
-            if gr == 'spine':
+            if gr in self.device_name['spine'].lower():
                 for sp in self.spine:
                     self.inventory.add_host(sp, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['spine_os'])
-            if gr == 'border':
+            if gr in self.device_name['border'].lower():
                 for br in self.border:
                     self.inventory.add_host(br, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['border_os'])
 
-            if gr == 'leaf':
+            if gr in self.device_name['leaf'].lower():
                 for lf in self.leaf:
                     self.inventory.add_host(lf, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['leaf_os'])

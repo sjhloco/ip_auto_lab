@@ -59,6 +59,7 @@
       assemble:
         src: "{{ ans.dir_path }}/{{ inventory_hostname }}/config"
         dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/config.cfg"
+        regexp: '\.conf$'           # Ensures only joins the files created by the roles
       changed_when: False           # Stops it reporting changes in playbook summary
       check_mode: False             # These tasks still make changes when in check mode
       tags: [bse_fbc, full]
@@ -114,5 +115,22 @@
     - name: Import custom_validate tasks to compare actual vs desired state
       import_role:
         name: fbc_validate
-        tasks_from: nxos    # Want to use "{{ ansible_network_os }}" but will only take a string
+        tasks_from: custom
       tags: [cus_val, post_val, full]
+
+
+    - name: "Create {{ ansible_network_os }} compliance report"
+      block:
+    #   # Loads the variable file and the genie parser role
+      - include_vars: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
+      - name: "NET >> Validating OSPF, Port-channels and VPC"
+      # Generates actual_state using napalm_cli
+        napalm_cli:
+          provider: "{{ ans.creds_all }}"
+          dev_os: "{{ ansible_network_os }}"
+          args:
+            commands:
+              - "show port-channel summary"
+        register: test
+      - debug: var=test.cli_results
+      tags: test

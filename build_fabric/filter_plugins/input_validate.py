@@ -33,19 +33,13 @@ class FilterModule(object):
     def base(self, device_name, addr, users):
         base_errors = ['Check the contents of base.yml for the following issues:']
 
-        # DEVICE_NAME (bse.device_name): Ensures that the device names used match the correct format as that is heavily used in inventory script logic
-        try:
-            assert re.match('.*-SPINE$', device_name['spine']), "-bse.device_name.spine format ({}) is not correct, it must end in '-SPINE'".format(device_name['spine'])
-        except AssertionError as e:
-            base_errors.append(str(e))
-        try:
-            assert re.match('.*-LEAF$', device_name['leaf']), "-bse.device_name.leaf format ({}) is not correct, it must end in '-LEAF'".format(device_name['leaf'])
-        except AssertionError as e:
-            base_errors.append(str(e))
-        try:
-            assert re.match('.*-BORDER$', device_name['border']), "-bse.device_name.border format ({}) is not correct, it must end in '-BORDER'".format(device_name['border'])
-        except AssertionError as e:
-            base_errors.append(str(e))
+        # DEVICE_NAME (bse.device_name): Ensures that the device names used match the correct format as is used to create group names
+        for dvc, name in device_name.items():
+            try:
+                assert re.search('-[a-zA-Z0-9_]+$', name), "-bse.device_name.{} format ({}) is not correct. Anything after " \
+                     "the last '-' is used for the group name so must be letters, digits or underscore".format(dvc, name)
+            except AssertionError as e:
+                base_errors.append(str(e))
 
         # ADDR (bse.addr): Ensures that the network addresses entered are valid networks (or IP for loopback) with the correct subnet mask
         for name, address in addr.items():
