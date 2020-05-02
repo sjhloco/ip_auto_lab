@@ -163,6 +163,7 @@ The main *custom_validate* method is called as a filter pluggin by Ansible. In t
 
 ## Notes and Improvements
 Have disabled ping from the napalm valdiation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
+Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
 1. Add simple diagram
 2. Add servicess config replace
