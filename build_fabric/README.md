@@ -75,6 +75,7 @@ These core elements are the minimum requirements to create the declarative fabri
 - mlag_border_ip: 10           *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
 
 ## Services - Tenant Variables
+
 Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the services_tenant.yml file. At a minimun the following values need to be defined per-tenant.
 
 - tenant_name: Name                   *Name of the VRF*
@@ -83,9 +84,9 @@ Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the
     - num: Number               
     - name: Name               
 
-Tenants (VRFs) will only be created on a border or leaf if a VLAN within that tenant is to be created on that device type. Even if it is not a L3 tenant a VRF will still be created and a L3VNI/VLAN number reserved.\
+Tenants (VRFs) will only be created on a border or leaf if a VLAN within that tenant is to be created on that device_role. Even if it is not a L3 tenant a VRF will still be created and a L3VNI/VLAN number reserved.\
 By default unless an IP address is assigned to a VLAN (*ip_addr*) it will only be Layer 2. If the VLAN is L3 it will automatically be redistributed into BGP, this can be disabled (*ipv4_bgp_redist: False*) on a per-vlan basis.\
-By default VLANs will only be created on the leaf switches (*create_on_lift*). On a per-vlan basis this can be changed so that they are created only on borders (*create_on_border*) or on both leafs and borders.
+VLANs will only be created on the leaf switches (*create_on_leaf*). On a per-vlan basis this can be changed so that they are created only on borders (*create_on_border*) or on both leafs and borders.
 
 To change any of these default settings add the extra dictionary key. 
 - tenant
@@ -94,22 +95,43 @@ To change any of these default settings add the extra dictionary key.
     - ipv4_bgp_redist: True or False          *Whether the SVI is redistributed into IPv4 BGP addr-fam (default True)*
     - create_on_leaf: True or False             *Whether this VLAN is created on the leafs (default True)*
     - create_on_border: True or False       *Whether this VLAN is created on the borders (default False)*
+    
+If it is a L3_tenant the route-map is always created for redistribution and attached tothe BGP peer, it is just empty (permit all) if not defined if *ipv4_bgp_redist* is set to default. The name of this route_map can be changed although it has restrictions.
+- ipv4_redist_rm_name:        *To change the redistribution route-map, it MUST still include 'vrf' and 'as'*t
 
 ### L2VNI and L3VNI numbers
-A jinja plugin
+The *services_tenant* varaibles are passed through a filter_plugin (*format_dm.py*) that creates a per device_role (border or leaf) data-modle that includes a L2VNI number and L3VNI number. These values are determined based on the base values defined in *services_tenant.yml* and incremnet per tenant.\
+These starting values can be changed but the increments of 1 for tnt_vlan/l3vni and 10,000 for l2vni can not be changed unless you do so in the *format_dm.py*.
 
-## Post Validation checks
+- tnt_vlan: 3001            *Transit L3VNI start VLAN number incrementing by 1 for each L3 tenant*
+- l3vni: 3001            *Transit L3VNI start VNI number incrementing by 1 for each L3 tenant*
+- l2vni: 10000            *Start L2VNI and the range to add to each tenants vlan incrementing by 10000 for each tenant*
 
-Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
+## Input validation
+Pre-task validation checks validate the details entered in the variable files ar correct rather than validating any configuration on devices. The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast stopping connections to devices and eliminating the possibility of having half configured devices.\
+They are run as part of the playbook pre-tasks with the rules on what defines a pass or failure defined within the filter_plugin *input_validate.py*. The plugin does the actual validation with a result the returned to the Anisble Asset module which decides if the playbook fails.
 
-```bash
-cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
-```
-The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
+To see a full list of what variables are checked and what the expected input is see the header notes of *input_validate.py*.
 
+## Playbook Structure
 
+The playbook is divided into 3 sections with roles used to do all the templating and validation.
+
+- pre_tasks: Creates the file structure and runs the pre validation tasks
+- task_roles: Roles are used to to create the templates and in some cases use pluggins to create new data models
+  - base: From templates and base.yml creates the base configuration snippets (aaa,  logging, mgmt, ntp, etc)
+  - fabric: From templates and fabric.yml creates the fabric configuration snippets (connections, OSPF, BGP)
+  - services: Has per-service type tasks and templates for the services to run on top of the fabric 
+    - svc_tnt: From templates and service_template.yml creates the tenant configuration snippets (VRF, SVI, VXLAN, VLAN)
+- task_config: Assembles the config snippets into the one file and applies as a config_replace
+- pre_tasks: A validate role creates and compares *desired_state* (built from variables) against *actual_state*    
+  - validate: custom_validate uses naplam_validate but can feed in device output to validate things not covered by naplam
+    - nap_val: For services covered by naplam_getters creates desired_state and compares against actual_state 
+    - nap_val: For services not covered by aplam_getters creates desired_state and compares against actual_state 
+    
 ## Directory Structure
-By default the following directory structure is created within *~/device_configs*, this base location can be changed using *ans.dir_path*.
+
+The following directory structure is created within *~/device_configs* to hold the configuration snippets, validation desired_state files,  and compliance reports. The base location can be changed using *ans.dir_path*.
 
 ```bash
 ~/device_configs/
@@ -117,6 +139,7 @@ By default the following directory structure is created within *~/device_configs
 │   ├── config
 │   │   ├── base.conf
 │   │   ├── config.conf
+│   │   ├── svc_tnt.conf
 │   │   └── fabric.cfg
 │   └── validate
 │       ├── napalm_desired_state.yml
@@ -124,7 +147,7 @@ By default the following directory structure is created within *~/device_configs
 ├── diff
 │   ├── DC1-N9K-BORDER01.txt
 └── reports
-    ├── DC1-N9K-BORDER01_fbc_compliance_report.json
+    ├── DC1-N9K-BORDER01_compliance_report.json
 ```
 
 ## Installation and Prerequisites
@@ -139,6 +162,7 @@ action_plugins = /home/ste/virt/ansible_2.8.4/lib/python3.6/site-packages/napalm
 The following base configuration needs to be manually added on all the devices.\
 Features *nxapi* and *scp-server* are required for Naplam *config_replace* so must be enabled beforehand.\
 Image validation can take a while on vNXOS so it is also best to do so beforehand.
+Changing the *hardware access-list tcam region* requires a reboot to take effect
 
 ```bash
 interface mgmt0
@@ -149,6 +173,8 @@ feature nxapi
 nxapi use-vrf management
 feature scp-server
 boot nxos bootflash:/nxos.9.2.4.bin
+hardware access-list tcam region racl 512
+hardware access-list tcam region arp-ether 256 double-wide
 ```
 
 Optionally run *ssh_key_playbook.yml* to automatically add all the new devices SSH keys to the *~/.ssh/known_hosts* file on the ansible host. Before running add the device IPs to the *ssh_hosts* file and install *ssh-keygen*. 
@@ -169,10 +195,12 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--bse**                 Generates the base configuration snippet and saves it to file\
 **--fbc**                    Generates the fabric configuration snippet and saves it to file\
 **--bse_fbc**          Generates the base and fabric config snippets and joins them together\
+**--tnt**          Generates the tenants config snippets and and saves it to file\
 
 **--cfg**                  Apply the configuration to devices (diffs are saved to file)\
 **--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
-**--rb**                    Reverses the changes by applying the rollback configuration\
+**--rb**                    Reverses the changes by applying the rollback configuration
+**--rb_diff**                    Reverses the changes by applying the rollback configuration and prints the diffs to screen
 
 **--val_temp**        Generates desired state validation files for *napalm_validate* and *custom_validate*\
 **--nap_val**           Generates validation file and runs generic *napalm_validate* to check LLDP, BGP and ping\
@@ -187,6 +215,16 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full, cfg_diff" -C
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 ```
 
+## Post Validation checks
+
+Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
+
+```bash
+cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
+```
+The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
+
+1 or more prefixes in bgp l2vpn addr family
 
 
 ## Notes and Improvements
@@ -194,8 +232,7 @@ Have disabled ping from the napalm valdiation as took too long, loopbacks with s
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
 1. Add simple diagram
-2. Add servicess config replace
-3. Add services as seperate playbook that is merge
+2. Add remaining services
 
 Nice to have
 1. Create a seperate playbook to update Netbox with information used to build the fabric
