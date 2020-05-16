@@ -49,51 +49,63 @@ These core elements are the minimum requirements to create the declarative fabri
 
 *addr:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
 
-- lp_net: x.x.x.x/32                  *Core OSPF and BGP peerings. By default will use .11 to .59*
+- lp_net: x.x.x.x/32                   *Core OSPF and BGP peerings. By default will use .11 to .59*
 - mgmt_net: x.x.x.x/27            *Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
-- mlag_net: x.x.x.x/28              *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
-- srv_ospf_net: x.x.x.x/28         *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
+- mlag_net: x.x.x.x/28                *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
+- srv_ospf_net: x.x.x.x/28        *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
 
 **fabric.yml** *(fbc)*\
 *network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine, 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
 
-- num_spines: x                       *Can have a maximum of 4*
+- num_spines: x                        *Can have a maximum of 4*
 - num_borders: x                     *Can have a maximum of 4*
 - num_leafs: x                          *Can have a maximum of 10*
 
 *address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
-- *spine_ip: 11*.                       Spine mgmt IP and routing loopback addresses will be from .11 to .14
-- *border_ip: 16*                     Border mgmt IP and routing loopback addresses will be from .16 to .19
-- *leaf_ip: 21*                           Leaf mgmt IP and routing loopback addresses will be from .21 to .30
-- *border_vtep_lp: 36*           Border VTEP loopback addresses will be from .36 to .39
-- *leaf_vtep_lp: 41*                 Leaf VTEP loopback addresses will be from .41 to .50
-- *border_mlag_lp: 56*         Pair of border shared loopback addresses (VIP) will be from .56 to .57
-- *leaf_mlag_lp: 51*               Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55
-- *border_bgw_lp: 58*            Pair of border  BGW shared anycast loopback addresses will be from .58 to .59
-- *mlag_leaf_ip: 0*               Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc
-- *mlag_border_ip: 10*          Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc
+- spine_ip: 11                       *Spine mgmt IP and routing loopback addresses will be from .11 to .14*
+- border_ip: 16                     *Border mgmt IP and routing loopback addresses will be from .16 to .19*
+- leaf_ip: 21                           *Leaf mgmt IP and routing loopback addresses will be from .21 to .30*
+- border_vtep_lp: 36           *Border VTEP loopback addresses will be from .36 to .39*
+- leaf_vtep_lp: 41                 *Leaf VTEP loopback addresses will be from .41 to .50*
+- border_mlag_lp: 56         *Pair of border shared loopback addresses (VIP) will be from .56 to .57*
+- leaf_mlag_lp: 51               *Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55*
+- border_bgw_lp: 58            *Pair of border  BGW shared anycast loopback addresses will be from .58 to .59*
+- mlag_leaf_ip: 0                *Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc*
+- mlag_border_ip: 10           *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
 
 ## Services - Tenant Variables
-The variables to create the tenants, SVIs, VLANs and VXLANs are entered in the services_tenant.yml file. At a minimun the following values need to be defined per-tenant.
+Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the services_tenant.yml file. At a minimun the following values need to be defined per-tenant.
 
 - tenant_name: Name                   *Name of the VRF*
-- l3_tenant: True or False            *Does it need SVIs or is routing done on a device external (i.e router)*
+- l3_tenant: True or False             *Does it need SVIs or is routing done on a device external (i.e router)*
   - vlans:                                   *List of VLANs within this tenant*
     - num: Number               
     - name: Name               
 
-Tenants (VRFs) will only be created on a border or leaf if a VLAN within that VRF is to be created on that device type. Even if it is not a L3 tenant a VRF will be created and a L3VNI/VLAN number reserved.
-By default unless an ip address is assigned to them (*ip_addr*) all VLANs will only be Layer 2. If the VLAN is L3 it will automatically be redistributed into BGP, this can be disabled (*ipv4_bgp_redist: False*).
-VLANs will only be created on the leaf switches (*create_on_lift*). On a per-vlan basis this can be changed so that they are created only on borders (*create_on_border*) or on both leafs and borders.
+Tenants (VRFs) will only be created on a border or leaf if a VLAN within that tenant is to be created on that device type. Even if it is not a L3 tenant a VRF will still be created and a L3VNI/VLAN number reserved.\
+By default unless an IP address is assigned to a VLAN (*ip_addr*) it will only be Layer 2. If the VLAN is L3 it will automatically be redistributed into BGP, this can be disabled (*ipv4_bgp_redist: False*) on a per-vlan basis.\
+By default VLANs will only be created on the leaf switches (*create_on_lift*). On a per-vlan basis this can be changed so that they are created only on borders (*create_on_border*) or on both leafs and borders.
 
-To change any of these default settings added the following extra Key:values pairs. 
+To change any of these default settings add the extra dictionary key. 
 - tenant
   - vlans:
     - ip_addr: x.x.x.x/24                              *Adding an IP address makes it a L3 VLAN (default L2 only)*
-    - ipv4_bgp_redist: True or False         *Whether the SVI is redistributed into IPv4 BGP addr-fam (default True)*
+    - ipv4_bgp_redist: True or False          *Whether the SVI is redistributed into IPv4 BGP addr-fam (default True)*
     - create_on_leaf: True or False             *Whether this VLAN is created on the leafs (default True)*
     - create_on_border: True or False       *Whether this VLAN is created on the borders (default False)*
+
+### L2VNI and L3VNI numbers
+A jinja plugin
+
+## Post Validation checks
+
+Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
+
+```bash
+cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
+```
+The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
 
 
 ## Directory Structure
@@ -175,14 +187,7 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full, cfg_diff" -C
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 ```
 
-## Post Validation checks
 
-Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
-
-```bash
-cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
-```
-The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
 
 ## Notes and Improvements
 Have disabled ping from the napalm valdiation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
