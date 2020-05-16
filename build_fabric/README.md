@@ -24,35 +24,35 @@ ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list         
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            Run against a playbook
 ```
 
-The following host_vars are created for every host, with the exception of *intf_mlag* and *mlag_peer_ip* which are not on spines.
-- ansible_host:         *string*
-- ansible_network_os:   *string*
-- intf_fbc:         *Dictionary with interface the keys and description the values*
-- intf_lp:      *List of dictionaries with the keys name, ip and descr*
-- intf_mlag:        *Dictionary with interface the keys and description the values*
-- mlag_peer_ip:     *string*
+With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all he following host_vars are created for every host. 
+- ansible_host:                 *string*
+- ansible_network_os:     *string*
+- intf_fbc:                          *Dictionary with interface the keys and description the values*
+- intf_lp:                            *List of dictionaries with the keys name, ip and descr*
+- intf_mlag:                       *Dictionary with interface the keys and description the values*
+- mlag_peer_ip:                *string*
 
 ## Core variable Elements
 
-These core elements are the minimum requirements to create the declarative fabric as are used for dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the templates which variable file the variable came from.
+These core elements are the minimum requirements to create the declarative fabric as they are used for the dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the playbook, roles and templates which variable file the variable came from.
 
 **ansible.yml** *(ans)*\
-*device_type:* Operating system of each device type (Spine, Leaf and Border)\
-*creds_all:* Hostname, username and password
+*device_type:* Operating system of each device type (spine, leaf and border)\
+*creds_all:* hostname, username and password
 
 **base.yml** *(bse)*\
-*device_name:* The naming format that the automatically generated node ID is added to (double decimal format 0x) and the group name created from. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore as this is used as the group name.
+*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and the group name created from (in lowercase). The group name is created from anything after the hyphen, so for 'DC1-N9K-SPINE' the group name would be 'spine'. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore as these are the only characters that Ansible accepts for group names.
 
-- spine: 'xx-xx'
-- border: 'xx-xx'
-- leaf: 'xx-xx'
+- spine: xx-xx
+- border: xx-xx
+- leaf: xx-xx
 
 *addr:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
 
-- *lp_net: 'x.x.x.x/32'*                 Core OSPF and BGP peerings. By default will use .11 to .59
-- *mgmt_net: 'x.x.x.x/27'*          Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)
-- *mlag_net: 'x.x.x.x/28'*             MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)
-- *srv_ospf_net: 'x.x.x.x/28'*        Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)
+- lp_net: x.x.x.x/32                 *Core OSPF and BGP peerings. By default will use .11 to .59*
+- mgmt_net: x.x.x.x/27         *Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
+- mlag_net: x.x.x.x/28             *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
+- srv_ospf_net: x.x.x.x/28        *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
 
 **fabric.yml** *(fbc)*\
 *network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine, 2 leafs. The border and leaf switches must be in increments of 2 as are in a MLAG pair.
