@@ -5,11 +5,11 @@ If you wish to have a more custom build the majority of the elements (unless spe
 
 This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
 
-- SPINE-to-LEAF: Eth1/1 - 1/10
-- SPINE-to-BORDER: Eth1/11 - 1/15
-- LEAF-to-SPINE: Eth1/1 - 1/5
-- BORDER-to-SPINE: Eth1/1 - 1/5
-- VPC Peer-link: Eth1/127 - 128
+- SPINE-to-LEAF: *Eth1/1 - 1/10*
+- SPINE-to-BORDER: *Eth1/11 - 1/15*
+- LEAF-to-SPINE: *Eth1/1 - 1/5*
+- BORDER-to-SPINE: *Eth1/1 - 1/5*
+- VPC Peer-link: *Eth1/127 - 128*
 
 ==ADD A DIAGRAM==
 
@@ -23,6 +23,14 @@ ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph        
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list           All devices and host_vars
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            Run against a playbook
 ```
+
+The following host_vars are created for every host, with the exception of *intf_mlag* and *mlag_peer_ip* which are not on spines.
+- ansible_host:         *string*
+- ansible_network_os:   *string*
+- intf_fbc:         *Dictionary with interface the keys and description the values*
+- intf_lp:      *List of dictionaries with the keys name, ip and descr*
+- intf_mlag:        *Dictionary with interface the keys and description the values*
+- mlag_peer_ip:     *string*
 
 ## Core variable Elements
 
