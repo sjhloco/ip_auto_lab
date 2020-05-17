@@ -22,11 +22,16 @@
         {{ hostvars[x].intf_lp[0].ip |ipaddr('address') }}:
           is_enabled: true
           is_up: true
+
 {% endfor %} {% else %}
 {% for x in groups[bse.device_name.spine.split('-')[-1].lower()] %}
         {{ hostvars[x].intf_lp[0].ip |ipaddr('address') }}:
           is_enabled: true
           is_up: true
+          address_family:
+            l2vpn:
+              received_prefixes: '>=1'
+
 {% endfor %} {% endif %}
 
 {##### Gets all loopback addresses from host_vars. Disabled as takes too long #####}

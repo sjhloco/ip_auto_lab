@@ -1,21 +1,36 @@
-"""Validates the core fabric variables in the base and fabric files are of the correct
-format to be able to run the playbook and build a fabric.
+"""Validates the input variables in the base, fabric and services files are of the correct
+format to be able to run the playbook, build a fabric and apply the services.
 A pass or fail is returned to the Ansible Assert module, if it fails the full output is also
 returned for the failure message. The following methods check:
 
--base using base.yml:
+-base configuration variables using base.yml:
 bse.device_name: Ensures that the device names used match the correct format as that is heavily used in inventory script logic
 bse.addr: Ensures that the network addresses entered are valid networks (or IP for loopback) with the correct subnet mask
 
--fabric using abric.yml
+-core fabric configuration variables  using fabric.yml
 fbc.network_size: Ensures the number of each type of device is within the limits and constraints
 fbc.ospf: Ensures that the OSPF process is present and area in dotted decimal format
 fbc.bgp.as_num: Ensures that the AS is present, cant make more specific incase is 2-byte or 4-byte ASNs
 fbc.acast_gw_mac: Ensures the anycast virtual MAC is a valid mac address
 fbc.adv.bse_intf: Ensures that the interface numbers are integrars
 fbc.adv.lp: Ensures all the loopback names are unique, no duplicates
-fbc.adv.mlag): Ensures all of MLAG paraemters are integers and VLANs within limit
+fbc.adv.mlag: Ensures all of MLAG paraemters are integers and VLANs within limit
 fbc.adv.addr_incre: Ensures all of the IP address increment values used are integers and except for mlag peering are all unique
+
+-tenants (VRFs, VNIs & VLANs) using services_tenant.yml
+svc_tnt.tnt.tenant_name: Ensures all tenants have a name, are no restictions of what is in it
+svc_tnt.tnt.l3_tenant: Ensures answer is boolean
+svc_tnt.tnt.vlans: Ensures vlans are defined, must be at least one
+svc_tnt.tnt.vlans.num: Ensures all VLANs are numbers and not conflicting
+svc_tnt.tnt.vlans.name: Ensures all VLANs have a name, are no restrictions of what it is
+svc_tnt.tnt.vlans.create_on_border: Ensures answer is boolean
+svc_tnt.tnt.vlans.create_on_leaf: Ensures answer is boolean
+svc_tnt.tnt.vlans.ipv4_bgp_redist: Ensures answer is boolean
+svc_tnt.tnt.vlans.ip_addr: Ensures that the IP address is of the correct format
+svc_tnt.tnt.vlans.num: Ensures all the VLAN numbers are unique, no duplicates
+svc_tnt.adv.bse_vni): Ensures all values are integers
+svc_tnt.adv.bgp.ipv4_redist_rm_name: Ensures that it contains both 'vrf' and 'as'
+
 """
 
 import re
@@ -26,10 +41,11 @@ class FilterModule(object):
     def filters(self):
         return {
             'input_bse_validate': self.base,
-            'input_fbc_validate': self.fabric
+            'input_fbc_validate': self.fabric,
+            'input_svc_tnt_validate': self.svc_tnt
         }
 
- # Validate formatting of variables within the base.yml file
+############  Validate formatting of variables within the base.yml file ############
     def base(self, device_name, addr, users):
         base_errors = ['Check the contents of base.yml for the following issues:']
 
@@ -69,7 +85,8 @@ class FilterModule(object):
         else:
             return base_errors
 
- # Validate formatting of variables within the fabric.yml file
+
+############ Validate formatting of variables within the fabric.yml file ############
     def fabric(self, network_size, route, acast_gw_mac, bse_intf, lp, mlag, addr_incre):
         fabric_errors = ['Check the contents of fabric.yml for the following issues:']
 
@@ -184,3 +201,97 @@ class FilterModule(object):
             return "'fabric.yml unittest pass'"             # For some reason ansible assert needs the inside quotes
         else:
             return fabric_errors
+
+
+############ Validate formatting of variables within the base.yml file ############
+    def svc_tnt(self, svc_tnt, adv):
+        svc_tnt_errors = ['Check the contents of services_tenant.yml for the following issues:']
+
+        for tnt in svc_tnt:
+            # TENANT_NAME (svc_tnt.tnt.tenant_name): Ensures all tenants have a name, are no restictions of what is in it
+            try:
+                assert tnt['tenant_name'] != None, "-svc_tnt.tnt.tenant_name, one of the tenants does not have a name"
+            except AssertionError as e:
+                svc_tnt_errors.append(str(e))
+            # L3_TENANT (svc_tnt.tnt.l3_tenant): Ensures answer is boolean
+            try:
+                assert isinstance(tnt['l3_tenant'], bool), "-svc_tnt.tnt.l3_tenant for tenant {} is not a boolean ({}), must be True or False".format(tnt['tenant_name'], tnt['l3_tenant'])
+            except AssertionError as e:
+                svc_tnt_errors.append(str(e))
+
+            # VLAN (svc_tnt.tnt.vlans): Ensures vlans are defined, must be at least one
+            try:
+                assert tnt['vlans'] != None, "-svc_tnt.tnt.vlans no VLANs in tenant {}, must be at least 1 VLAN to create the tenant ".format(tnt['tenant_name'])
+            except AssertionError as e:
+                svc_tnt_errors.append(str(e))
+                return svc_tnt_errors
+
+            # Used by duplicate VLAN check
+            dup_vl = []
+            uniq_vl = {}
+
+            for vl in tnt['vlans']:
+                # VLAN_NUMBER (svc_tnt.tnt.vlans.num): Ensures all VLANs are numbers and not conflicting
+                try:
+                    assert isinstance(vl['num'], int), "-svc_tnt.tnt.vlans.num VLAN '{}' should be a numerical value".format(vl['num'])
+                except AssertionError as e:
+                    svc_tnt_errors.append(str(e))
+
+                # VLAN_NAME (svc_tnt.tnt.vlans.name): Ensures all VLANs have a name, are no restrictions of what it is
+                try:
+                    assert vl['name'] != None, "-svc_tnt.tnt.vlans.name VLAN{} does not have a name".format(vl['num'])
+                except AssertionError as e:
+                    svc_tnt_errors.append(str(e))
+
+                # Create dummy default values if these settings arent set in the variable file
+                vl.setdefault('create_on_border', False)
+                vl.setdefault('create_on_leaf', True)
+                vl.setdefault('ipv4_bgp_redist', True)
+                vl.setdefault('ip_addr', '169.254.255.254/16')
+
+                # CREATE_ON_BDR, CREATE_ON_LEAF, REDIST (svc_tnt.tnt.vlans): Ensures answer is boolean
+                for opt in ['create_on_border', 'create_on_leaf', 'ipv4_bgp_redist']:
+                    try:
+                        assert isinstance(vl[opt], bool), "-svc_tnt.tnt.vlans.{} in VLAN{} is not a boolean ({}), "\
+                                                      "must be True or False".format(opt, vl['num'], vl[opt])
+                    except AssertionError as e:
+                        svc_tnt_errors.append(str(e))
+
+                # IP_ADDR (svc_tnt.tnt.vlans.ip_addr): Ensures that the IP address is of the correct format
+                try:
+                    ipaddress.IPv4Interface(vl['ip_addr']).ip
+                except ipaddress.AddressValueError:
+                    svc_tnt_errors.append("-svc_tnt.tnt.vlans.ip_addr ({}) is not a valid IPv4 address".format(vl['ip_addr']))
+
+                # DUPLICATE VLANS (svc_tnt.tnt.vlans.num): Ensures all the VLAN numbers are unique, no duplicates
+                if vl['num'] not in uniq_vl:
+                    uniq_vl[vl['num']] = 1
+                else:
+                    if uniq_vl[vl['num']] == 1:
+                        dup_vl.append(vl['num'])
+                    uniq_vl[vl['num']] += 1
+            try:
+                assert len(dup_vl) == 0, "svc_tnt.tnt.vlans.num {} is/are duplicated in tenant {}, "\
+                                         "all VLANs within a tenant should be unique".format(dup_vl, tnt['tenant_name'])
+            except AssertionError as e:
+                svc_tnt_errors.append(str(e))
+
+        # BASE_VNI (svc_tnt.adv.bse_vni): Ensures all values are integers
+        for opt in ['tnt_vlan', 'l3vni', 'l2vni']:
+            try:
+                assert isinstance(adv['bse_vni'][opt], int), "-adv.bse_vni.{} ({}) should be a numerical value".format(opt, adv['bse_vni'][opt])
+            except AssertionError as e:
+                svc_tnt_errors.append(str(e))
+
+        # RM_NAME (svc_tnt.adv.bgp.ipv4_redist_rm_name): Ensures that it contains both 'vrf' and 'as'
+        try:
+            assert re.search(r'vrf\S*as|as\S*vrf', adv['bgp']['ipv4_redist_rm_name']), "-adv.bgp.ipv4_redist_rm_name format ({}) is not correct. " \
+                                "It must contain 'vrf' and 'as' within its name".format(adv['bgp']['ipv4_redist_rm_name'])
+        except AssertionError as e:
+            svc_tnt_errors.append(str(e))
+
+        # The value returned to Ansible Assert module to determine whether failed or not
+        if len(svc_tnt_errors) == 1:
+            return "'service_tenant.yml unittest pass'"             # For some reason ansible assert needs the inside quotes
+        else:
+            return svc_tnt_errors

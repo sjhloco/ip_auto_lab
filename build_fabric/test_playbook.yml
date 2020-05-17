@@ -1,69 +1,131 @@
 ---
  ################################# TESTING templates, vars, and napalm getters   #################################
 
-
-
 - name: "Test templates and vars"
   # hosts: all
-  hosts: all
+  hosts: DC1-N9K-BORDER01
   connection: local
   vars_files:
     - vars/ansible.yml
-    - vars/base.yml
-    - vars/fabric.yml
+#     - vars/base.yml
+#     - vars/fabric.yml
   tasks:
-  - name: "SYS >> Create config snippets"
-    template:
-      # src: roles/validate/templates/nxos/fbc_validate.j2
-      # dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/nxos_val.yml"
-      src: roles/validate/templates/fbc_validate.j2
-      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/napalm_val.yml"
-    tags: tmp
+#   - name: "SYS >> Create config snippets"
+#     template:
+#       # src: roles/validate/templates/nxos/fbc_validate.j2
+#       # dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/nxos_val.yml"
+#       src: roles/validate/templates/fbc_validate.j2
+#       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/napalm_val.yml"
+#     tags: tmp
 
-#   - block:
-#     - name: "NET >> Checking BGP Peerings"
-#       napalm_get_facts:
-#         provider: "{{ ans.creds_all }}"
-#         dev_os: "{{ ansible_network_os }}"
-#         filter: lldp_neighbors
-#       register: output
-#     - debug:
-#         msg: "{{ output }}"
-#     tags: nap
+  # - block:
+  #   - name: "NET >> Checking BGP Peerings"
+  #     napalm_get_facts:
+  #       provider: "{{ ans.creds_all }}"
+  #       dev_os: "{{ ansible_network_os }}"
+  #       filter: bgp_neighbors
+  #     register: output
+  #   - debug:
+  #       msg: "{{ output }}"
+  #   tags: nap
 
-#   - name: "SYS >> Print to screen"
-#     debug:
-#       # msg: "{{ fbc.adv.lp.rtr.keys() |list }}"
-#       msg: "{{ intf_lp.fbc.adv.lp.rtr.key() | list }}"
-#       # msg: "{{ intf_lp.loopback0.keys() | list | ipaddr('address') }}"
-#       # msg:  "{{ '192.168.100.16/32' | ipaddr('address') }}"
-#     tags: prt
+  - name: "SYS >> Print to screen"
+    debug:
+      # msg: "{{ fbc.adv.lp.rtr.keys() |list }}"
+      # msg: "{{ intf_lp.fbc.adv.lp.rtr.key() | list }}"
+      # msg: "{{ intf_lp.loopback0.keys() | list | ipaddr('address') }}"
+      # msg:  "{% if '192.168.100.16' | ipaddr == True %}  HELLO {% endif %}"
+      msg: "{% if 'None' | ipaddr != False %} HELLO {% endif %}"
+      # "{{ '192.168.100.16/32' | ipaddr('address') }}"
+    tags: prt
+
+ ################################# Test pre_validation  #################################
+
+# - name: "Deploy Leaf and Spine DC"
+#   # hosts: all
+#   hosts: DC1-N9K-BORDER01
+#   connection: local
+#   vars_files:
+#     - vars/ansible.yml            # All varaibles start with ans.
+#     - vars/services_tenant.yml               # All varaibles start with bse.
+
+# ######################## 1. Validates the input data (in var_files) and creates the file strucuture ########################
+#   tasks:
+#     # 1a. Validate that the required elements in the variable files are all defined and in the correct format
+#     - name: "Validate the contents of the variable files"
+#       block:
+#       # - name: "SYS >> Validating the contents of base.yml"
+#         # assert:
+#         #   # Uses a filter pluggin (validate_base) to do the validating and returns the outcome to the Anisble assert module
+#         #   that: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }} == 'base.yml unittest pass'"
+#         #   quiet: yes
+#         #   fail_msg: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }}"
+#       - set_fact:
+#           test: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }}"
+#       - debug: var=test
+
+
+
+
+ ################################# services   #################################
+
+# - name: "TST services"
+#   hosts: DC1-N9K-BORDER01:DC1-N9K-LEAF01:DC1-N9K-SPINE01
+#   # hosts: DC1-N9K-BORDER01
+#   connection: local
+#   vars_files:
+#     - vars/ansible.yml
+#     - vars/base.yml
+#     - vars/fabric.yml
+#     - vars/services_tenant.yml
+#   tasks:
+#   # - block:
+#   - name: "SYS >> Use Python to create complete data-model"
+#     set_fact:
+#       flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni) }}"   # Completes data-model with VNI
+#       # srv_ports_dm: "{{ srv_ports |srv_ports_dm(srv_ports_adv, srv_tenants) }}"      # Completes data-model with interface & PO/VPC
+#     changed_when: false
+#     run_once: true
+#   - name: "SYS >> Generating fabric config snippets"
+#     template:
+#       src: "svc_tnt_template.j2"
+#       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/tnt_svc.conf"
+#     changed_when: False           # Stops it reporting changes in playbook summary
+#     check_mode: False             # These tasks still make changes when in check mode
+#     when: bse.device_name.spine not in inventory_hostname
+
+
+  # - debug:
+  #     var: flt_svc_tnt
+
+    # tags: services
+
 
 
  ################################# TESTING napalm VALDIATION    #################################
-- name: "test NAPALM validate"
-  hosts: all
-  connection: local
-  vars_files:
-    - vars/ansible.yml
+# - name: "test NAPALM validate"
+#   hosts: all
+#   connection: local
+#   vars_files:
+#     - vars/ansible.yml
 
-  tasks:
-    - name: Use Napalm validate LLDP
-      napalm_validate:
-        provider: "{{ ans.creds_all }}"
-        dev_os: "{{ ansible_network_os }}"
-        validation_file: /home/ste/device_configs/{{ inventory_hostname }}/napalm_val.yml
-      register: nap_val
-      ignore_errors: yes
+#   tasks:
+#     - name: Use Napalm validate LLDP
+#       napalm_validate:
+#         provider: "{{ ans.creds_all }}"
+#         dev_os: "{{ ansible_network_os }}"
+#         validation_file: /home/ste/device_configs/{{ inventory_hostname }}/napalm_val.yml
+#       register: nap_val
+#       ignore_errors: yes
 
-    - name: Display full compliance report
-      debug:
-        var: nap_val.compliance_report
+#     - name: Display full compliance report
+#       debug:
+#         var: nap_val.compliance_report
 
-    - name: Compliance check failed
-      fail:
-        msg: "Non-compliant state encountered. Refer to the full report."
-      when: not nap_val.compliance_report.complies
+#     - name: Compliance check failed
+#       fail:
+#         msg: "Non-compliant state encountered. Refer to the full report."
+#       when: not nap_val.compliance_report.complies
 
 
 

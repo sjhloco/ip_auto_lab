@@ -6,7 +6,7 @@
   block:
   - name: "SYS >> Creating the {{ ansible_network_os }} validation files"
     template:
-      src: "{{ ansible_network_os }}/fbc_val_template.j2"
+      src: "{{ ansible_network_os }}/val_tmpl.j2"
       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
     changed_when: False
   tags: val_tmpl
@@ -16,7 +16,7 @@
   block:
 #   # Loads the variable file and the genie parser role
   - include_vars: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
-  - name: "NET >> Validating OSPF, Port-channels and VPC"
+  - name: "NET >> Validating OSPF, Port-channels, VPC, VTEPs, VNIs and L3 interfaces"
   # Generates actual_state using napalm_cli
     napalm_cli:
       provider: "{{ ans.creds_all }}"
@@ -36,24 +36,12 @@
       that: "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, ans.dir_path,
              inventory_hostname, ansible_network_os) }} == 'custom_validate passed'"
       quiet: yes
-      fail_msg: "Non-compliant state encountered. Refer to the full report in {{ ans.dir_path }}/reports/"
+      fail_msg: "Non-compliant state encountered. Refer to the full report {{ ans.dir_path }}/reports/{{ inventory_hostname }}_compliance_report.json"
     loop: "{{ output.results }}"
     loop_control:
       label: "{{ item.cli_results.keys() | list | first }}"
       index_var: lp_idx
   when: not ansible_check_mode          # Dont want to run validation in check_mode
 
-
-
-# TSHOOT: Used to print out what you get from custom_validate when thsooting, still need to change return output in custom_validate
-# - name: "Create {{ ansible_network_os }} compliance report"
-#   block:
-#   - set_fact:
-#       test:  "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, ans.dir_path, inventory_hostname, ansible_network_os) }}"
-#     loop: "{{ output.results }}"
-#     loop_control:
-#       label: "{{ item.cli_results.keys() | list | first }}"
-#       index_var: lp_idx
-#   - debug: var=test
 
 

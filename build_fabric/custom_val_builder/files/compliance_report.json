@@ -1,0 +1,1 @@
+{"show ip int brief include-secondary vrf all": {"complies": false, "present": {"management": {"complies": true, "nested": true}, "default": {"complies": true, "nested": true}}, "missing": ["GRN"], "extra": []}, "skipped": [], "complies": false}

@@ -3,11 +3,13 @@
 
 - name: "Deploy Leaf and Spine DC"
   hosts: all
+  # hosts: DC1-N9K-SPINE01
   connection: local
   vars_files:
     - vars/ansible.yml            # All varaibles start with ans.
     - vars/base.yml               # All varaibles start with bse.
     - vars/fabric.yml             # All varaibles start with fbc.
+    - vars/services_tenant.yml    # All varaibles start with svc_tnt
 
 ######################## 1. Validates the input data (in var_files) and creates the file strucuture ########################
   pre_tasks:
@@ -16,10 +18,11 @@
       block:
       - name: "SYS >> Validating the contents of base.yml"
         assert:
-          # Uses a filter pluggin (validate_base) to do the validating and returns the outcome to the Anisble assert module
+          # Uses a filter pluggin input_validate to do the validating and returns the outcome to the Anisble assert module
           that: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }} == 'base.yml unittest pass'"
           quiet: yes
           fail_msg: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }}"
+          # Uses a filter pluggin  input_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of fabric.yml"
         assert:
           that: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp,
@@ -27,8 +30,15 @@
           quiet: yes
           fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
                       fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
+        # Uses a filter pluggin  input_svc_validate to do the validating and returns the outcome to the Anisble assert module
+      - name: "SYS >> Validating the contents of services_tenant.yml"
+        assert:
+          that: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }} == 'service_tenant.yml unittest pass'"
+          quiet: yes
+          fail_msg: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }}"
       run_once: true        # Doesnt need to run for every hosts as just validating files.
       tags: [pre_val, full]
+
     # 1b. Create the file structure
     - name: "Create the localhost environment"
       block:
@@ -48,12 +58,27 @@
       tags: [dir, full]
 
 ######################## 2. Create the config snippets from templates ########################
-  roles:
-    - base
-    - fabric
+  # roles:
+  #   - base
+  #   - fabric
+  tasks:
+    - name: Builds the base config snippet
+      import_role:
+        name: base
+      tags: [bse, bse_fbc, full]
+    - name: Builds the fabric config snippet
+      import_role:
+        name: fabric
+      tags: [fbc, bse_fbc, full]
+    - name: Builds the tenant config snippets
+      import_role:
+        name: services
+        tasks_from: svc_tnt
+      tags: [tnt, full]
+
 
 ######################## 3. Join the config snippets into one file and deploy ########################
-  tasks:
+  # tasks:
   # 3a. Join the all config snippets from the folder into the one big file
     - name: "SYS >> Joining config snippets into one file"
       assemble:
@@ -114,11 +139,17 @@
       tags: [full]
     - name: Import napalm_validate tasks to compare actual vs desired state
       import_role:
-        name: fbc_validate
-        tasks_from: napalm
+        name: validate
+        tasks_from: nap_val
       tags: [nap_val, post_val, full]
+
     - name: Import custom_validate tasks to compare actual vs desired state
-      import_role:
-        name: fbc_validate
-        tasks_from: custom
+      block:
+      # Passes svc_tnt through filter to get per device-role DMs
+      - set_fact:
+          flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre) }}"
+      - name: Import custom_validate tasks to compare actual vs desired state
+        import_role:
+          name: validate
+          tasks_from: cus_val
       tags: [cus_val, post_val, full]

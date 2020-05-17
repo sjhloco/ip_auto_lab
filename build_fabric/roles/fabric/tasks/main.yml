@@ -3,9 +3,8 @@
 
 - name: "SYS >> Generating fabric config snippets"
   template:
-    src: "{{ ansible_network_os }}/fabric_template.j2"
+    src: "{{ ansible_network_os }}/fbc_tmpl.j2"
     dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/fabric.conf"
   changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False             # These tasks still make changes when in check mode
-  register: test
-  tags: [fbc, bse_fbc, full]
+  # tags: [fbc, bse_fbc, full]

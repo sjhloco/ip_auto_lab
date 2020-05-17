@@ -1,0 +1,63 @@
+
+cmds:
+  - show ip int brief include-secondary vrf all:
+      management:
+        mgmt0:
+          prefix: 10.10.108.16
+          proto-state: up
+          link-state: up
+          admin-state: up
+      default:
+        Lo1:
+          _mode: strict
+          prefix: 192.168.100.16
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Lo2:
+          _mode: strict
+          prefix: ('192.168.100.36', '192.168.100.56')
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Lo3:
+          _mode: strict
+          prefix: 192.168.100.58
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Eth1/1:
+          prefix: None
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Eth1/2:
+          prefix: None
+          proto-state: up
+          link-state: up
+          admin-state: up
+
+        Vlan2:
+          prefix: 10.255.255.10
+          proto-state: up
+          link-state: up
+          admin-state: up
+
+
+      GRN:
+        _mode: strict
+        Vlan110:
+          prefix: 10.250.110.1
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Vlan120:
+          prefix: 10.250.120.1
+          proto-state: up
+          link-state: up
+          admin-state: up
+        Vlan3002:
+          proto-state: up
+          link-state: up
+          admin-state: up
+

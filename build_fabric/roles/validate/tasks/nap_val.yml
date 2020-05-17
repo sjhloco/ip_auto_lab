@@ -6,7 +6,7 @@
   block:
   - name: "SYS >> Creating the Napalm validation files"
     template:
-      src: napalm/fbc_val_template.j2
+      src: napalm/val_tmpl.j2
       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/napalm_desired_state.yml"
     changed_when: False
   tags: val_tmpl
@@ -26,11 +26,11 @@
 
 # 4c. REPORT: The compliance Report is saved to file no matter what the outcome. Output to screen is not verbose unless non-compliant.
   - name: "SYS >> Saving compliance reports to {{ ans.dir_path }}/reports/"
-    copy: content="{{ nap_val.compliance_report }}" dest={{ ans.dir_path }}/reports/{{ inventory_hostname }}_fbc_compliance_report.json
+    copy: content="{{ nap_val.compliance_report }}" dest={{ ans.dir_path }}/reports/{{ inventory_hostname }}_compliance_report.json
     changed_when: False
     ignore_errors: yes          # Needed so continues to the FAIL play
   - name: "FAIL >> Compliance check failed"
     fail:
-      msg: "Non-compliant state encountered. Refer to the full report in {{ ans.dir_path }}/reports/"
+      msg: "Non-compliant state encountered. Refer to the full report in {{ ans.dir_path }}/reports/{{ inventory_hostname }}_compliance_report.json"
     when: not nap_val.compliance_report.complies
   when: not ansible_check_mode          # Dont want to run validation in check_mode

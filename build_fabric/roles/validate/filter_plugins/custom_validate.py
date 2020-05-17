@@ -79,14 +79,11 @@ class FilterModule(object):
 
         # Feeds the validation file and new data model through the reporting function
         result = self.compliance_report(desired_state, actual_state, directory, hostname)
-        # Only the compliance report outcome is sent to Ansible Assert module, not the full report.
+        # # Only the compliance report outcome is sent to Ansible Assert module, not the full report.
         if result["complies"] == True:
             return "'custom_validate passed'"
         else:
             return "'custom_validate failed'"
-
-        # return actual_state       # For tshooting
-
 
 ############################################ OS data-model generators ############################################
 # NXOS: Formats the actual_state into data models to return to the engine that then passes it through the reporting method
@@ -117,5 +114,28 @@ class FilterModule(object):
         elif list(desired_state.keys())[0] == "show vpc":
             actual_state['vpc_peer_keepalive_status'] = json_output['vpc-peer-keepalive-status']
             actual_state['vpc_peer_status'] = json_output['vpc-peer-status']
+
+        elif list(desired_state.keys())[0] == "show ip int brief include-secondary vrf all":
+            vrf_list = []
+            for intf in json_output['TABLE_intf']['ROW_intf']:
+                vrf_list.append(intf['vrf-name-out'])
+            for vrf in set(vrf_list):
+                intf_list = defaultdict(dict)
+                for intf in json_output['TABLE_intf']['ROW_intf']:
+                    if vrf == intf['vrf-name-out']:
+                        intf_list[intf['intf-name']]['proto-state'] = intf['proto-state']
+                        intf_list[intf['intf-name']]['link-state'] = intf['link-state']
+                        intf_list[intf['intf-name']]['admin-state'] = intf['admin-state']
+                        intf.setdefault('prefix', None)
+                        intf_list[intf['intf-name']]['prefix'] = intf['prefix']
+                actual_state[vrf] = intf_list
+
+        elif list(desired_state.keys())[0] == "show nve peers":
+            for peer in json_output['TABLE_nve_peers']['ROW_nve_peers']:
+                actual_state[peer['peer-ip']] = {'peer-state': peer['peer-state']}
+
+        elif list(desired_state.keys())[0] == "show nve vni":
+            for vni in json_output['TABLE_nve_vni']['ROW_nve_vni']:
+                actual_state[vni['vni']] = {'type': vni['type'], 'state': vni['vni-state']}
 
         return actual_state

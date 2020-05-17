@@ -9,6 +9,8 @@ ip domain-name {{ bse.services.domain }}
 ip name-server {{ bse.services.dns.prim }} {{ bse.services.dns.sec }}
 crypto key param rsa label {{ inventory_hostname }}.{{ bse.services.domain }} modulus 2048
 boot nxos bootflash:/{{ bse.adv.image }}
+hardware access-list tcam region racl 512
+hardware access-list tcam region arp-ether 256 double-wide
 
 system default switchport shutdown
 no nxapi http
@@ -113,6 +115,7 @@ line vty
   access-class {{ bse.mgmt_acl[1]['acl_name'] }} in
 
 {####### Other settings such as resourse, roles, CoPP, RMON and callhome #######}
+copp profile strict
 vdc {{ inventory_hostname }} id 1
   limit-resource vlan minimum 16 maximum 4094
   limit-resource vrf minimum 2 maximum 4096

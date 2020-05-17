@@ -1,0 +1,62 @@
+---
+- name: "Create a Custom Validation"
+  # hosts: all
+  # hosts: DC1-N9K-LEAF02
+  hosts: DC1-N9K-BORDER01
+  # hosts: DC1-N9K-SPINE01
+  connection: local
+  vars_files:
+    - vars/fabric.yml
+    - vars/base.yml
+    - vars/my_vars.yml
+    - vars/ansible.yml
+    - vars/services_tenant.yml
+
+  tasks:
+    # TEMPLATE: Creates validation file of expected desired state from the input data
+    - name: "SYS >> Creating the validation files"
+      block:
+      - set_fact:
+          flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre) }}"   # Completes data-model with VNI
+        check_mode: False             # These tasks still make changes when in check mode
+        run_once: true                # Only has to run once to create the new data-models
+      - template:
+          src: "val_tmpl.j2"
+          dest: "files/desired_state.yml"
+        changed_when: False
+      tags: [tmpl, dev_val, file_val]
+
+    # DEVICE_OUTPUT: napalm_cli gets the actual state and feeds it into custom_validate
+    - name: "Create compliance report from dynamic device output"
+      block:
+      - include_vars: "files/desired_state.yml"
+      - name: "NET >> Getting cmd output from device"
+        napalm_cli:
+          provider: "{{ ans.creds_all }}"
+          dev_os: "{{ ansible_network_os }}"
+          args:
+            commands:
+              - "{{ item.keys() | list | first }} | json"
+        register: output
+        loop: "{{ cmds }}"
+        loop_control:
+          label: "{{ item.keys() | list | first }}"
+      - name: "SYS >> Creating compliance report"
+        set_fact:
+          result:  "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, 'device') }}"
+        loop: "{{ output.results }}"
+        loop_control:
+          label: "{{ item.cli_results.keys() | list | first }}"
+          index_var: lp_idx
+      - debug: var=result
+      tags: [dev_val]
+
+  # FILE_INPUT: Runs custom_validate using a static input of the device output
+    - name: "SYS >> Creating compliance report"
+      block:
+      - include_vars: "files/desired_state.yml"
+      - set_fact:
+          result:  "{{ cmds[0] | custom_validate(lookup('file','files/file_input.json'), 'file') }}"
+      - debug: var=result
+      tags: [file_val]
+
