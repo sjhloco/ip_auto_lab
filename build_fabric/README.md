@@ -269,7 +269,9 @@ Have disabled ping from the napalm validation as took too long, loopbacks with s
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
 1. Add simple diagram
+2. Need to make it so post-validation doesnt run tnt checks if only running base and fabric
 2. Add remaining services
+
 
 Nice to have
 1. Create a seperate playbook to update Netbox with information used to build the fabric
