@@ -269,7 +269,7 @@ Have disabled ping from the napalm validation as took too long, loopbacks with s
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
 1. Add simple diagram
-2. Need to make it so post-validation doesnt run tnt checks if only running base and fabric
+2. Need to make it so post-validation doesnt run tnt checks if only running base and fabric. SO a different template used for napalm_validate (as  fail since needs 1 prefix) and custom_validate
 2. Add remaining services
 
 
