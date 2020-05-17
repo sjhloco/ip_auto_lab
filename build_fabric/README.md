@@ -100,18 +100,23 @@ If it is a L3_tenant the route-map is always created for redistribution and atta
 - ipv4_redist_rm_name:        *To change the redistribution route-map, it MUST still include 'vrf' and 'as'*t
 
 ### L2VNI and L3VNI numbers
-The *services_tenant* varaibles are passed through a filter_plugin (*format_dm.py*) that creates a per device_role (border or leaf) data-modle that includes a L2VNI number and L3VNI number. These values are determined based on the base values defined in *services_tenant.yml* and incremnet per tenant.\
-These starting values can be changed but the increments of 1 for tnt_vlan/l3vni and 10,000 for l2vni can not be changed unless you do so in the *format_dm.py*.
+The *services_tenant* variables are passed through a filter_plugin (*format_dm.py*) that creates a per device_role (border or leaf) data-model that includes the L2VNI and L3VNI numbers. These values of these are determined based on the base values that are incremneted on a per-tenant basis.\
+These starting values and increments can be changed in the advanced section of the *services_tenant.yml* variable file.
 
-- tnt_vlan: 3001            *Transit L3VNI start VLAN number incrementing by 1 for each L3 tenant*
-- l3vni: 3001            *Transit L3VNI start VNI number incrementing by 1 for each L3 tenant*
-- l2vni: 10000            *Start L2VNI and the range to add to each tenants vlan incrementing by 10000 for each tenant*
+- bse_vni:
+  - tnt_vlan: 3001            *Starting VLAN number for transit L3VNI*
+  - l3vni: 3001                  *Starting VNI number for transit L3VNI*
+  - l2vni: 10000              *Start L2VNI and the range to add to each tenants vlan*
+- vni_incre:
+  - tnt_vlan: 1            *Value by which to increase transit L3VNI VLAN number for each tenant*
+  - l3vni: 1                  *Value by which to increase transit L3VNI VNI number for each tenant*
+  - l2vni: 10000              *SValue by which to increase the L2VNI range used (range + vlan) for each tenant*
 
 ## Input validation
-Pre-task validation checks validate the details entered in the variable files ar correct rather than validating any configuration on devices. The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast stopping connections to devices and eliminating the possibility of having half configured devices.\
-They are run as part of the playbook pre-tasks with the rules on what defines a pass or failure defined within the filter_plugin *input_validate.py*. The plugin does the actual validation with a result the returned to the Anisble Asset module which decides if the playbook fails.
+Rather than validating any configuration on devices it validate the details entered in the variable files are correct .The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection.\
+They are run as part of the playbook pre-tasks with the rules on what defines a pass or failure defined within the filter_plugin *input_validate.py*. The plugin does the actual validation with a result returned to the Anisble Asset module which decides if the playbook fails.
 
-To see a full list of what variables are checked and what the expected input is see the header notes of *input_validate.py*.
+To see a full list of what variables are checked and the expected input view the header notes of *input_validate.py*.
 
 ## Playbook Structure
 
@@ -122,12 +127,12 @@ The playbook is divided into 3 sections with roles used to do all the templating
   - base: From templates and base.yml creates the base configuration snippets (aaa,  logging, mgmt, ntp, etc)
   - fabric: From templates and fabric.yml creates the fabric configuration snippets (connections, OSPF, BGP)
   - services: Has per-service type tasks and templates for the services to run on top of the fabric 
-    - svc_tnt: From templates and service_template.yml creates the tenant configuration snippets (VRF, SVI, VXLAN, VLAN)
+    - svc_tnt: From templates and service_template.yml creates the tenant config snippets (VRF, SVI, VXLAN, VLAN)
 - task_config: Assembles the config snippets into the one file and applies as a config_replace
 - pre_tasks: A validate role creates and compares *desired_state* (built from variables) against *actual_state*    
-  - validate: custom_validate uses naplam_validate but can feed in device output to validate things not covered by naplam
-    - nap_val: For services covered by naplam_getters creates desired_state and compares against actual_state 
-    - nap_val: For services not covered by aplam_getters creates desired_state and compares against actual_state 
+  - validate: custom_validate uses naplam_validate feed with device output to validate things not covered by naplam
+    - nap_val: For elements covered by naplam_getters creates desired_state and compares against actual_state 
+    - nap_val: For elements not covered by naplam_getters creates desired_state and compares against actual_state 
     
 ## Directory Structure
 
@@ -195,11 +200,11 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--bse**                 Generates the base configuration snippet and saves it to file\
 **--fbc**                    Generates the fabric configuration snippet and saves it to file\
 **--bse_fbc**          Generates the base and fabric config snippets and joins them together\
-**--tnt**          Generates the tenants config snippets and and saves it to file\
+**--tnt**                  Generates the tenants config snippets and and saves it to file
 
 **--cfg**                  Apply the configuration to devices (diffs are saved to file)\
 **--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
-**--rb**                    Reverses the changes by applying the rollback configuration
+**--rb**                    Reverses the changes by applying the rollback configuration\
 **--rb_diff**                    Reverses the changes by applying the rollback configuration and prints the diffs to screen
 
 **--val_temp**        Generates desired state validation files for *napalm_validate* and *custom_validate*\
@@ -217,18 +222,50 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 
 ## Post Validation checks
 
-Post Validation checks create a validation file from the configuration variables (desired state) and compare that against the  actual state. *Napalm_validate* can only perform a compliance on anything that has a getter, it is used to validate BGP, connections (LLDP) and rachability between loopback addresses. A *custom_validate* pluggin uses napalm_validate framework inputting its own desired_state and actual state_files on which a compliance report is generated. This validates OSPF, LAG and MLAG. The results of these two tasks are joined to create the one compliance report stored in */device_configs/reports*.
+Builds a validation file from the configuration variables of the expected state (*desired state*) and compare that against the *actual state* of the device. *Napalm_validate* can only perform a compliance on anything that has a getter so for anything not covered by this the *custom_validate* pluggin is used. It uses the napalm_validate framework to create the same format of compliance report but the input is from a formated device output (can be got via any network module or napalm) rather than from napalm_validate.
+
+Both validation engines are within the same role with seperate temaples and task files. The templates generate the desired state which is a combination of the commmands to run and the expected returned values. The desired state is store in */device_configs/device_name/validate*, with a separate file for napalm_validate and custom_validate.
+
+The results of these two tasks are joined together to create the one compliance report stored in */device_configs/reports*.
 
 ```bash
-cat ~/device_configs/reports/DC1-N9K-SPINE01_fbc_compliance_report.json | python -m json.tool
+cat ~/device_configs/reports/DC1-N9K-SPINE01_compliance_report.json | python -m json.tool
 ```
-The main *custom_validate* method is called as a filter pluggin by Ansible. In the pluggin it has other device specific methods to create the data model that is complaince checked, these are called by the *custom_validate* method. Therefore to expand this to other device types just need to add a new device specific method within the pluggin. 
 
-1 or more prefixes in bgp l2vpn addr family
+### napalm_validate
+By Napalms very nature it already abstracts the vendor so along as the vendor is supported and the getter exists the template files are the same for all vendors. The following elments are checked:
+- hostname: *Automatically created device names are correct*
+- bgp_neighbors: *Overlay neighbors are all up and at least one prefix received*
+- lldp_neighbors: *Device connections are correct*
 
+Note I did try ICMP but takes too long, the lines for this are hashed out
+
+### custom_validate
+*custom_validate* requires a per-OS type template file and per-OS type method within the custom_validate filter_plugin. The command output can be ascertained via naplam or Ansible Network modules, ideally as JSON or you could use NTC templates or the genieparse collection to do this for you. Within *custom_validate.py* it matches based on the command and creates a new data model that matches the format of the desired state. Finally the *actual_state* and *desired_state* are fed into napalm_validate using its *compliance_report* method. The following elments are checked:
+
+- show ip ospf neighbors detail: *Underlay neighbors are all up*
+- show port-channel summary: *Port-channel adn members up*
+- show vpc: *MLAG peer link and keepl-alive up*
+- show ip int brief include-secondary vrf all: *All L3 interfaces in fabric and tenants up with correct IPs*
+- show nve peers: *All VTEP tunnels are up*
+- show nve vni: *All VNIs are up, have correct VNI number and VLAN mapping*
+
+To aid with creating new validations the custom_val_builder is a stripped down version of custom_validate to use to build new validations. The README has the process but can basically feed in either feed in static dictionary file or device output to aid in the creation of the method code and template snippet before testing and then movign to the main playbook.
+
+## Building a new service
+
+Process for building a new service:
+1. vars.yml: Build the input variable file. It should be nested dictionary with the root being a short acronym as helps identify which files variables come from
+2. format_dm.py: Add a method to this to create the per-device_role DM. Python is more flexibale that jinaj for formatting so helps to keep the template a lot cleaner.
+3. tasks.yml: Create a new task that will hold 2 plays, one to generate the new DM and one to render the template
+4. tmpl.j2: Create the template that has logic to decide flt_vars based on device_role. 
+5. tasks_from: Under tasks of the main playbook import the role and the name of this new task.
+6. input_validation.py: Add a new method that uses try/except asser statements to validate the input variables.
+7. pre_tasks: Add a new Ansible assert module play that references the new input_val method
+8. post_checks: use custom_val_builder to build validation tests and then add to 'roles/validate/filter_plugin/custom_validate.py' and 'roles/validate/templates/nxos/val_tmpl.j2'
 
 ## Notes and Improvements
-Have disabled ping from the napalm valdiation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
+Have disabled ping from the napalm validation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
 1. Add simple diagram
@@ -236,5 +273,5 @@ Not sure about rollback, all though says all worked odd switch didnt rollback (f
 
 Nice to have
 1. Create a seperate playbook to update Netbox with information used to build the fabric
-1. Add fabric vPC (dont think possible) and multisite
+1. Add fabric vPC (dont think possible) and multi-site
 2. Add templates for Arista
