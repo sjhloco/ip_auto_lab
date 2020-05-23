@@ -6,10 +6,10 @@ If you wish to have a more custom build the majority of the elements (unless spe
 This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
 
 - SPINE-to-LEAF: *Eth1/1 - 1/10*
-- SPINE-to-BORDER: *Eth1/11 - 1/15*
-- LEAF-to-SPINE: *Eth1/1 - 1/5*
-- BORDER-to-SPINE: *Eth1/1 - 1/5*
-- VPC Peer-link: *Eth1/127 - 128*
+- SPINE-to-BORDER: *Eth1/11 - 1/14*
+- LEAF-to-SPINE: *Eth1/1 - 1/4*
+- BORDER-to-SPINE: *Eth1/1 - 1/4*
+- MLAG Peer-link: *Eth1/11 - 12*
 
 ==ADD A DIAGRAM==
 
