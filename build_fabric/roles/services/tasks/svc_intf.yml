@@ -1,0 +1,29 @@
+---
+### Uses template to build the tenant configuration, so VRFs, SVIs, VXLANs and VLANs using variables from services_tenant.yml) ###
+
+- name: "Create the tenant configuration snippets"
+  block:
+  - include_vars: "vars/services_interface.yml"
+  - include_vars: "vars/fabric.yml"
+  - name: "SYS >> Creating per-device-role service_tenant data-models"
+    set_fact:
+      flt_svc_intf: "{{ svc_intf.type |create_svc_intf_dm(inventory_hostname, svc_intf.adv, fbc.adv.bse_intf) }}"
+  - debug:
+      var=flt_svc_intf
+
+
+
+  # check_mode: False             # These tasks still make changes when in check mode
+  # run_once: true                # Only has to run once to create the new data-models
+
+
+
+
+# - name: "SYS >> Generating service_tenant config snippets"
+#   template:
+#     src: "svc_tnt_tmpl.j2"
+#     dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/svc_tnt.conf"
+#   changed_when: False           # Stops it reporting changes in playbook summary
+#   check_mode: False             # These tasks still make changes when in check mode
+#   when: bse.device_name.spine not in inventory_hostname
+

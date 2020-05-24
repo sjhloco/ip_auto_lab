@@ -1,0 +1,128 @@
+###################### Service: Device Ports ######################
+# The interface to use can be specified or picked from an editable default range
+# Are 3 types of ports (access, trunk or layer3) with the intf_var been specific for the type (vlan, allowed vlans or ip address).
+# Single-homed interfaces are only created on the switch specified
+# dual-homed ports must specify the odd number switch, template will automatically add config on its VPC neighbor switch
+# If the Layer 3 interface is created on the border alos have the ability to enable OSPF on that interface
+
+
+# po_mode will alwasy be LACP active unless specified otherwise
+# will use the default range of POs unless one is psecified
+#### Base variables ####
+svc_intf:
+  type:
+    access:
+      - descr: DC1-SRV-APP01 eth1
+        ip_vlan: 10
+        switch: DC1-N9K-LEAF01
+      - descr: DC1-SRV-PRD01 eth1
+        ip_vlan: 20
+        switch: DC1-N9K-LEAF01
+
+    stp_trunk:
+      - descr: DC1-VIOS-SW1
+        ip_vlan: 50, 51
+        switch: DC1-N9K-LEAF01
+      - descr: DC1-VIOS-SW2
+        ip_vlan: 50
+        switch: DC1-N9K-BORDER01
+
+    non_stp_trunk:
+      - descr: DC1-LTM-LB01
+        ip_vlan: 20
+        switch: DC1-N9K-LEAF01
+      - descr: DC1-LTM-ESX1
+        ip_vlan: 10, 11, 12, 20
+        switch: DC1-N9K-LEAF01
+
+    layer3:
+      - descr: L3 > DC1-ASAv-XFW01 eth1
+        tenant: RED
+        ip_vlan: 10.255.99.99/30
+        dual_homed: False
+        switch: DC1-N9K-BORDER01
+      - descr: L3 > DC1-SRV-MON01 nic1
+        tenant: BLU
+        ip_vlan: 10.10.10.20/30
+        dual_homed: False
+        switch: DC1-N9K-LEAF01
+
+#### Advanced variables ####
+# Set the Interface and PO/VPC ranges to be used
+
+  adv:                  # Reserved interface range that server ports can be automatically assigned from (applies to all leaf and border switches)
+    dual_homed:                   # Used only for dual-homed devices
+      first_intf: 13     # First interface
+      last_intf: 32      # Last interface
+      po: 13                      # First PortChannel used
+      vpc: 13                     # First VPC used
+    single_homed:                 # Used only for single-homed devices
+      first_intf: 33    # First interface
+      last_intf: 40      # Last interface
+
+
+
+
+# In plugin:
+# Add the port number X
+# add the po/vpc number - POS can be added to interfcace list and looped through lwith rest of interfaces
+# add the vrf         X
+# define if dual homed
+# defin PO mode
+# Define description  X
+# spannign tree type  X
+
+
+
+
+
+
+    # single_homed:                         # For devices only attached to one switch
+    #   - descr: ACCESS > DC1-SRV-APP01 eth1       # Used on interface descr
+    #     type: access                 # Can be access, trunk or layer3
+    #     ip_vlan: 10                 # If access the vlan, if trunk the allowed vlans (seperated by ,) and if Layer3 the IP address
+    #     switch: ACCESS > DC1-N9K-LEAF01            # Name of the switch to which the port is added
+    #   - descr: ACCESS > DC1-SRV-PRD01 eth1
+    #     type: trunk
+    #     ip_vlan: [10, 11]
+    #     switch: DC1-N9K-LEAF02
+    #   - descr: UPLINK > DC1-ASR-RTR01 eth1
+    #     type: layer3
+    #     ip_vlan: 192.168.255.1/30     # If is layer3 the variable is the IP address
+    #     switch: DC1-N9K-BORDER02
+    # dual_homed:                             # For devices only attached to one switch
+    #   - descr: DC1-ESX-HST01
+    #     po_mode: active                     # Port-channels mode
+    #     type: trunk
+    #     intf_var: 10, 11, 12, 20          # Allowed VLANs over the trunk
+    #     switch: DC1-N9K-LEAF01              # Just add the name of the odd numbered switch in the VPC pair, template works out the pairs name
+    #   - descr: DC1-LTM-LB01
+    #     po_mode: active
+    #     type: access
+    #     intf_var: 20
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: DC1-VIOS-SW1
+    #     po_mode: active
+    #     type: trunk
+    #     intf_var: 50, 51
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: DC1-ASAv-XFW01
+    #     po_mode: active
+    #     type: layer3
+    #     intf_var: 192.168.12.10/30
+    #     vrf: prod
+    #     routing:
+    #       pro: 98                                       # The same process number is used on all border switches
+    #       area: 0.0.0.1
+    #     switch: DC1-N9K-BORDER01
+
+
+
+
+
+
+
+
+
+
+

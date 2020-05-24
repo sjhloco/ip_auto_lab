@@ -2,8 +2,8 @@
 # This playbook is used to to deploy leaf and spine topology
 
 - name: "Deploy Leaf and Spine DC"
-  hosts: all
-  # hosts: DC1-N9K-SPINE01
+  # hosts: all
+  hosts: DC1-N9K-BORDER01
   connection: local
   vars_files:
     - vars/ansible.yml            # All varaibles start with ans.
@@ -75,6 +75,12 @@
         name: services
         tasks_from: svc_tnt
       tags: [tnt, full]
+
+    - name: Builds the tenant config snippets
+      import_role:
+        name: services
+        tasks_from: svc_intf
+      tags: [test]
 
 
 ######################## 3. Join the config snippets into one file and deploy ########################

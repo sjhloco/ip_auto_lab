@@ -33,10 +33,10 @@ fbc:
       ec_fmt: Port-channel                  # LAG interface naming format
       ec_short: Po                          # Used in descritions of LAG interfaces
       sp_to_lf: 1                           # First interface used for SPINE to LEAF links (1 to 10)
-      sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 44)
+      sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 14)
       lf_to_sp: 1                           # First interface used LEAF to SPINE links (1 to 4)
       bdr_to_sp: 1                          # First interface used BORDER to SPINE links (1 to 4)
-      mlag_peer: 14-15                      # Interfaces used for the MLAG peer Link (will be in the MLAG LAG)
+      mlag_peer: 11-12                      # Interfaces used for the MLAG peer Link (will be in the MLAG LAG)
 
     # Loopback interfaces to be used, numbers and descriptions can be changed. As per best practise one per function.
     lp:
