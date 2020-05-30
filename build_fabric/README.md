@@ -5,13 +5,15 @@ If you wish to have a more custom build the majority of the elements (unless spe
 
 This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
 
-- SPINE-to-LEAF: *Eth1/1 - 1/10*
-- SPINE-to-BORDER: *Eth1/11 - 1/14*
-- LEAF-to-SPINE: *Eth1/1 - 1/4*
-- BORDER-to-SPINE: *Eth1/1 - 1/4*
-- MLAG Peer-link: *Eth1/11 - 12*
+- SPINE-to-LEAF:          *Eth1/1 - 1/10*
+- SPINE-to-BORDER:    *Eth1/11 - 1/14*
+- LEAF-to-SPINE:          *Eth1/1 - 1/4*
+- BORDER-to-SPINE:    *Eth1/1 - 1/4*
+- MLAG Peer-link:         *Eth1/11 - 12*
 
-==ADD A DIAGRAM==
+![image](https://user-images.githubusercontent.com/33333983/83332342-9b246500-a292-11ea-9455-7cbe56e0d701.png)
+
+This whole playbook is based on using the one module for all the connections. I have not tested how it will work with multiple modules, the role *intf_cleanup* will likely not work. This role ensures interface configuration is decelerative by defaulting non-used interfaces, therefore could be excluded without breakign the playbook.
 
 ## Dynamic Inventory
 
@@ -19,53 +21,85 @@ A custom inventory plugin is used to create the dynamic inventory and *host_vars
 
 ```bash
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01     Host attributes
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph          Groups and members
-ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list           All devices and host_vars
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                            Run against a playbook
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph                    Groups and members
+ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list                     All devices and host_vars
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                                      Run against a playbook
 ```
 
-With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all he following host_vars are created for every host. 
+With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all the following host_vars are created for every host. 
 - ansible_host:                 *string*
 - ansible_network_os:     *string*
 - num_intf:                        *Number of the first and last interface on the switch*
 - intf_fbc:                          *Dictionary with interface the keys and description the values*
 - intf_lp:                            *List of dictionaries with the keys name, ip and descr*
 - intf_mlag:                       *Dictionary with interface the keys and description the values*
-- mlag_peer_ip:                *string*
+- mlag_peer_ip:                *string in the format x.x.x.x*
+
+An example of the host_vars for a leaf switch:
+```bash
+{
+    "ansible_host": "10.10.108.21",
+    "ansible_network_os": "nxos",
+    "intf_fbc": {
+        "Ethernet1/1": "UPLINK > DC1-N9K-SPINE01 Eth1/1",
+        "Ethernet1/2": "UPLINK > DC1-N9K-SPINE02 Eth1/1"
+    },
+    "intf_lp": [
+        {
+            "descr": "LP > Routing protocol RID and peerings",
+            "ip": "192.168.100.21/32",
+            "name": "loopback1"
+        },
+        {
+            "descr": "LP > VTEP Tunnels (PIP) and MLAG (VIP)",
+            "ip": "192.168.100.41/32",
+            "mlag_lp_addr": "192.168.100.51/32",
+            "name": "loopback2"
+        }
+    ],
+    "intf_mlag": {
+        "Ethernet1/11": "MLAG peer-link > DC1-N9K-LEAF02 Eth1/11",
+        "Ethernet1/12": "MLAG peer-link > DC1-N9K-LEAF02 Eth1/12",
+        "Port-channel1": "MLAG peer-link > DC1-N9K-LEAF02 Po1"
+    },
+    "mlag_peer_ip": "10.255.255.0/31",
+    "num_intf": "1,128"
+}
+```
 
 ## Fabric Core Variable Elements
 
-These core elements are the minimum requirements to create the declarative fabric as they are used for the dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the playbook, roles and templates which variable file the variable came from.
+These core elements are the minimum requirements to create the declarative fabric. They are used for the dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the playbook, roles and templates which variable file the variable came from.
 
 **ansible.yml** *(ans)*\
 *device_type:* Operating system of each device type (spine, leaf and border)\
 *creds_all:* hostname, username and password
 
 **base.yml** *(bse)*\
-*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and the group name created from (in lowercase). The group name is created from anything after the hyphen, so for 'DC1-N9K-SPINE' the group name would be 'spine'. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore as these are the only characters that Ansible accepts for group names.
+*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and group name created from (in lowercase). The group name is created from characters after the last hyphen, so for 'DC1-N9K-SPINE' the group name would be 'spine'. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore. This is a limitaiton of Ansible as these are the only characters that Ansible accepts for group names.
 
 - spine: xx-xx
 - border: xx-xx
 - leaf: xx-xx
 
-*addr:* Subnets from which device specific IP addresses are generated. The addresses assigned are based on the device role increment and the node number. These must have the mask in prefix format (/).
+*addr:* The subnets from which the device specific IP addresses are generated. The addresses assigned are based on the *device role increment* and the *node number*. These must have the mask in prefix format (/x).
 
 - lp_net: x.x.x.x/32                   *Core OSPF and BGP peerings. By default will use .11 to .59*
 - mgmt_net: x.x.x.x/27            *Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
-- mlag_net: x.x.x.x/28                *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
+- mlag_net: x.x.x.x/28               *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
 - srv_ospf_net: x.x.x.x/28        *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
 
 **fabric.yml** *(fbc)*\
-*network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine, 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
+*network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine and 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
 
 - num_spines: x                        *Can have a maximum of 4*
-- num_borders: x                     *Can have a maximum of 4*
-- num_leafs: x                          *Can have a maximum of 10*
+- num_borders: x                      *Can have a maximum of 4*
+- num_leafs: x                           *Can have a maximum of 10*
 
-*num_intf:* The number of interfaces on the device (first and last interface). This is needed to make the interfaces decelerative by ensuring all that are not configured are reset to the default settings.
-- spine: 1,128                        *First and last spine interfaces*
-- border: 1,128                        *First and last border interfaces*
-- leaf: 1,128                        *First and last leaf interfaces*
+*num_intf:* Defines the number of interfaces on the device by specifiying the first and last interface. This required to make interfaces decelerative so that if you change an interface the old interface is reset to the default settings.
+- spine: 1,128                          *First and last spine device interface*
+- border: 1,128                        *First and last border device interface*
+- leaf: 1,128                             *First and last leaf device interface*
 
 *address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
