@@ -147,13 +147,78 @@ The *services_tenant* variables are passed through a filter_plugin (*format_dm.p
 These starting values and increments can be changed in the advanced section of the *services_tenant.yml* variable file.
 
 - bse_vni:
-  - tnt_vlan: 3001              *Starting VLAN number for transit L3VNI*
-  - l3vni: 3001                   *Starting VNI number for transit L3VNI*
-  - l2vni: 10000                 *Start L2VNI and the range to add to each tenants vlan*
+  - tnt_vlan: 3001              *Starting VLAN number for the transit L3VNI*
+  - l3vni: 3001                   *Starting VNI number for the transit L3VNI*
+  - l2vni: 10000                 *Starting L2VNI number, the VLAN number is added to this*
 - vni_incre:
-  - tnt_vlan: 1                   *Value by which to increase transit L3VNI VLAN number for each tenant*
-  - l3vni: 1                        *Value by which to increase transit L3VNI VNI number for each tenant*
-  - l2vni: 10000              *Value by which to increase the L2VNI range used (range + vlan) for each tenant*
+  - tnt_vlan: 1                    *Value by which to increase transit L3VNI VLAN number for each tenant*
+  - l3vni: 1                         *Value by which to increase transit L3VNI VNI number for each tenant*
+  - l2vni: 10000               *Value by which to increase the L2VNI range (range + vlan) for each tenant*
+
+An example of the host_vars for a leaf switch:
+```bash
+{
+    "bgp_redist_tag": 3001,
+    "l3_tnt": true,
+    "l3vni": 3001,
+    "tnt_name": "BLU",
+    "tnt_redist": true,
+    "tnt_vlan": 3001,
+    "vlans": [
+        {
+            "create_on_border": false,
+            "create_on_leaf": true,
+            "ip_addr": "10.10.10.1/24",
+            "ipv4_bgp_redist": true,
+            "name": "data",
+            "num": 10,
+            "vni": 10010
+        },
+        {
+            "ip_addr": "l3_vni",
+            "ipv4_bgp_redist": false,
+            "name": "BLU_L3VNI",
+            "num": 3001,
+            "vni": 3001
+        }
+    ]
+}
+
+{
+    "bgp_redist_tag": 3004,
+    "l3_tnt": false,
+    "l3vni": 3004,
+    "tnt_name": "RED",
+    "tnt_redist": false,
+    "tnt_vlan": 3004,
+    "vlans": [
+        {
+            "create_on_border": true,
+            "create_on_leaf": false,
+            "ip_addr": null,
+            "ipv4_bgp_redist": false,
+            "name": "red-ctt1",
+            "num": 90,
+            "vni": 40090
+        },
+        {
+            "ip_addr": "l3_vni",
+            "ipv4_bgp_redist": false,
+            "name": "RED_L3VNI",
+            "num": 3004,
+            "vni": 3004
+        }
+    ]
+}
+```
+
+## Services - Interface Variables
+You can either use the ranges or define the POs and interfaces manaully
+The VPC cant be set manaully and will alwasy bee the PO number
+You can use interfaces within the ranges for staic assignments, but would advise using sperate ranegs ffor static and dynmiac to avoid confusion
+If not using single homed or dual-homed interfaces make sure hash out header
+
+## Interface Cleanup - Defaulting Interfaces
 
 ## Input validation
 Rather than validating any configuration on devices it validate the details entered in the variable files are correct .The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection.\
@@ -311,12 +376,11 @@ Process for building a new service:
 Have disabled ping from the napalm validation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
-1. Add simple diagram
-2. Need to make it so post-validation doesnt run tnt checks if only running base and fabric. SO a different template used for napalm_validate (as  fail since needs 1 prefix) and custom_validate. Can either use wehn statements or tags
+1. Need to make it so post-validation doesnt run tnt checks if only running base and fabric. SO a different template used for napalm_validate (as  fail since needs 1 prefix) and custom_validate. Can either use wehn statements or tags
 2. Add remaining services
 
 
 Nice to have
 1. Create a seperate playbook to update Netbox with information used to build the fabric
-1. Add fabric vPC (dont think possible) and multi-site
+1. Add multi-site
 2. Add templates for Arista
