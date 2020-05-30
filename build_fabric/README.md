@@ -15,7 +15,7 @@ This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By defaul
 
 This whole playbook is based on using the one module for all the connections. I have not tested how it will work with multiple modules, the role *intf_cleanup* will likely not work. This role ensures interface configuration is decelerative by defaulting non-used interfaces, therefore could be excluded without breakign the playbook.
 
-As Python is a lot more flexible than Ansible the dynamic inventory and custom plugins (within the roles) do the manipulating of the datA in the variable files to create the data models that are used by the templates. This helps to abstract a lot of the complexity out of the jinja templates making it easier to create new templates for different vendors as just you only have to worry about the device configuration rather than data manipulation.
+As Python is a lot more flexible than Ansible the dynamic inventory and custom filter plugins (within the roles) do the manipulating of the datA in the variable files to create the data models that are used by the templates. This helps to abstract a lot of the complexity out of the jinja templates making it easier to create new templates for different vendors as just you only have to worry about the device configuration rather than data manipulation.
 
 ## Dynamic Inventory
 
@@ -155,7 +155,7 @@ These starting values and increments can be changed in the advanced section of t
   - l3vni: 1                         *Value by which to increase transit L3VNI VNI number for each tenant*
   - l2vni: 10000               *Value by which to increase the L2VNI range (range + vlan) for each tenant*
 
-An example of the host_vars for a leaf switch:
+An example of a data model created by the *format_dm.py* custom filter plugin. These are created on a device_role basis, so for all leaf switches and for all border switches.
 ```bash
 {
     "bgp_redist_tag": 3001,
