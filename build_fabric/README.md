@@ -27,7 +27,7 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                          
 With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all he following host_vars are created for every host. 
 - ansible_host:                 *string*
 - ansible_network_os:     *string*
-- num_intf:                       *Number of the first and last interface on the switch*
+- num_intf:                        *Number of the first and last interface on the switch*
 - intf_fbc:                          *Dictionary with interface the keys and description the values*
 - intf_lp:                            *List of dictionaries with the keys name, ip and descr*
 - intf_mlag:                       *Dictionary with interface the keys and description the values*
