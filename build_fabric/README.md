@@ -5,15 +5,17 @@ If you wish to have a more custom build the majority of the elements (unless spe
 
 This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
 
-- SPINE-to-LEAF:          *Eth1/1 - 1/10*
-- SPINE-to-BORDER:    *Eth1/11 - 1/14*
-- LEAF-to-SPINE:          *Eth1/1 - 1/4*
-- BORDER-to-SPINE:    *Eth1/1 - 1/4*
-- MLAG Peer-link:         *Eth1/11 - 12*
+- SPINE-to-LEAF:           *Eth1/1 - 1/10*
+- SPINE-to-BORDER:     *Eth1/11 - 1/14*
+- LEAF-to-SPINE:           *Eth1/1 - 1/4*
+- BORDER-to-SPINE:     *Eth1/1 - 1/4*
+- MLAG Peer-link:          *Eth1/11 - 12*
 
 ![image](https://user-images.githubusercontent.com/33333983/83332342-9b246500-a292-11ea-9455-7cbe56e0d701.png)
 
 This whole playbook is based on using the one module for all the connections. I have not tested how it will work with multiple modules, the role *intf_cleanup* will likely not work. This role ensures interface configuration is decelerative by defaulting non-used interfaces, therefore could be excluded without breakign the playbook.
+
+As Python is a lot more flexible than Ansible the dynamic inventory and custom plugins (within the roles) do the manipulating of the datA in the variable files to create the data models that are used by the templates. This helps to abstract a lot of the complexity out of the jinja templates making it easier to create new templates for different vendors as just you only have to worry about the device configuration rather than data manipulation.
 
 ## Dynamic Inventory
 
@@ -103,32 +105,33 @@ These core elements are the minimum requirements to create the declarative fabri
 
 *address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
-- spine_ip: 11                       *Spine mgmt IP and routing loopback addresses will be from .11 to .14*
-- border_ip: 16                     *Border mgmt IP and routing loopback addresses will be from .16 to .19*
+- spine_ip: 11                        *Spine mgmt IP and routing loopback addresses will be from .11 to .14*
+- border_ip: 16                      *Border mgmt IP and routing loopback addresses will be from .16 to .19*
 - leaf_ip: 21                           *Leaf mgmt IP and routing loopback addresses will be from .21 to .30*
-- border_vtep_lp: 36           *Border VTEP loopback addresses will be from .36 to .39*
-- leaf_vtep_lp: 41                 *Leaf VTEP loopback addresses will be from .41 to .50*
-- border_mlag_lp: 56         *Pair of border shared loopback addresses (VIP) will be from .56 to .57*
-- leaf_mlag_lp: 51               *Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55*
-- border_bgw_lp: 58            *Pair of border  BGW shared anycast loopback addresses will be from .58 to .59*
-- mlag_leaf_ip: 0                *Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc*
-- mlag_border_ip: 10           *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
+- border_vtep_lp: 36            *Border VTEP loopback addresses will be from .36 to .39*
+- leaf_vtep_lp: 41                  *Leaf VTEP loopback addresses will be from .41 to .50*
+- border_mlag_lp: 56          *Pair of border shared loopback addresses (VIP) will be from .56 to .57*
+- leaf_mlag_lp: 51                *Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55*
+- border_bgw_lp: 58             *Pair of border  BGW shared anycast loopback addresses will be from .58 to .59*
+- mlag_leaf_ip: 0                 *Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc*
+- mlag_border_ip: 10            *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
 
 ## Services - Tenant Variables
 
-Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the services_tenant.yml file. At a minimun the following values need to be defined per-tenant.
+Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the *services_tenant.yml* file. At a minimun the following values need to be defined per-tenant.
 
-- tenant_name: Name                   *Name of the VRF*
+- tenant_name: string                   *Name of the VRF*
 - l3_tenant: True or False             *Does it need SVIs or is routing done on a device external (i.e router)*
-  - vlans:                                   *List of VLANs within this tenant*
-    - num: Number               
-    - name: Name               
+  - vlans:                                    *List of VLANs within this tenant*
+    - num: integrar               
+    - name: string               
 
-Tenants (VRFs) will only be created on a border or leaf if a VLAN within that tenant is to be created on that device_role. Even if it is not a L3 tenant a VRF will still be created and a L3VNI/VLAN number reserved.\
-By default unless an IP address is assigned to a VLAN (*ip_addr*) it will only be Layer 2. If the VLAN is L3 it will automatically be redistributed into BGP, this can be disabled (*ipv4_bgp_redist: False*) on a per-vlan basis.\
-VLANs will only be created on the leaf switches (*create_on_leaf*). On a per-vlan basis this can be changed so that they are created only on borders (*create_on_border*) or on both leafs and borders.
+Tenants (VRFs) will only be created on a border or leaf if a VLAN within that tenant is to be created on that device. Even if it is not a L3 tenant a VRF will still be created and a L3VNI/VLAN number reserved.\
 
-To change any of these default settings add the extra dictionary key. 
+Unless an IP address is assigned to a VLAN (*ip_addr*) it will only be Layer 2 VLAN. If the VLAN is L3 it will automatically be redistributed into BGP, this can be disabled (*ipv4_bgp_redist: False*) on a per-vlan basis.\
+By default VLANs will only be created on the leaf switches (*create_on_leaf*). This can be changed on a per-vlan basis so that they are created only on borders (*create_on_border*) or are created on both leafs and borders.
+
+To change these settings add any of the following extra dictionaries to the tenant. 
 - tenant
   - vlans:
     - ip_addr: x.x.x.x/24                              *Adding an IP address makes it a L3 VLAN (default L2 only)*
@@ -136,21 +139,21 @@ To change any of these default settings add the extra dictionary key.
     - create_on_leaf: True or False             *Whether this VLAN is created on the leafs (default True)*
     - create_on_border: True or False       *Whether this VLAN is created on the borders (default False)*
     
-If it is a L3_tenant the route-map is always created for redistribution and attached tothe BGP peer, it is just empty (permit all) if not defined if *ipv4_bgp_redist* is set to default. The name of this route_map can be changed although it has restrictions.
-- ipv4_redist_rm_name:        *To change the redistribution route-map, it MUST still include 'vrf' and 'as'*t
+If the tenant is a L3_tenant the route-map for redistribution is always created and attached to the BGP peer. By default *ipv4_bgp_redist* is set to True meaning that the route-map will be empty (*permit all*). The name of this route_map can be changed, although it does have a few restrictions on the naming format.
+- ipv4_redist_rm_name:        *To change the redistribution route-map name, it MUST still include 'vrf' and 'as'*
 
 ### L2VNI and L3VNI numbers
-The *services_tenant* variables are passed through a filter_plugin (*format_dm.py*) that creates a per device_role (border or leaf) data-model that includes the L2VNI and L3VNI numbers. These values of these are determined based on the base values that are incremneted on a per-tenant basis.\
+The *services_tenant* variables are passed through a filter_plugin (*format_dm.py*) that creates a per device_role (border or leaf) data-model that includes the L2VNI and L3VNI numbers. These values are derived from base settings which are incremneted on a per-tenant basis.\
 These starting values and increments can be changed in the advanced section of the *services_tenant.yml* variable file.
 
 - bse_vni:
-  - tnt_vlan: 3001            *Starting VLAN number for transit L3VNI*
-  - l3vni: 3001                  *Starting VNI number for transit L3VNI*
-  - l2vni: 10000              *Start L2VNI and the range to add to each tenants vlan*
+  - tnt_vlan: 3001              *Starting VLAN number for transit L3VNI*
+  - l3vni: 3001                   *Starting VNI number for transit L3VNI*
+  - l2vni: 10000                 *Start L2VNI and the range to add to each tenants vlan*
 - vni_incre:
-  - tnt_vlan: 1            *Value by which to increase transit L3VNI VLAN number for each tenant*
-  - l3vni: 1                  *Value by which to increase transit L3VNI VNI number for each tenant*
-  - l2vni: 10000              *SValue by which to increase the L2VNI range used (range + vlan) for each tenant*
+  - tnt_vlan: 1                   *Value by which to increase transit L3VNI VLAN number for each tenant*
+  - l3vni: 1                        *Value by which to increase transit L3VNI VNI number for each tenant*
+  - l2vni: 10000              *Value by which to increase the L2VNI range used (range + vlan) for each tenant*
 
 ## Input validation
 Rather than validating any configuration on devices it validate the details entered in the variable files are correct .The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection.\
