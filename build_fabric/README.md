@@ -62,6 +62,11 @@ These core elements are the minimum requirements to create the declarative fabri
 - num_borders: x                     *Can have a maximum of 4*
 - num_leafs: x                          *Can have a maximum of 10*
 
+*num_intf:* The number of interfaces on the device (first and last interface). This is needed to make the interfaces decelerative by ensuring all that are not configured are reset to the default settings.
+- spine: 1,128                        *First and last spine interfaces*
+- border: 1,128                        *First and last border interfaces*
+- leaf: 1,128                        *First and last leaf interfaces*
+
 *address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
 - spine_ip: 11                       *Spine mgmt IP and routing loopback addresses will be from .11 to .14*
