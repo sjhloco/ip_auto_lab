@@ -213,45 +213,44 @@ An example of a data model created by the *format_dm.py* custom filter plugin. T
 ```
 
 ## Services - Interface Variables
-Interfaces are configured based on the variables stored in the *services_interfaces.yml* file. They can be single-homed or dual-homed with the port number and port-channel number either entered manaully or dynamically chosen from a range of interfaces. 
+Interfaces are configured based on the variables specified in the *services_interfaces.yml* file. They can be singleor dual-homed with the interface and port-channel number either entered manually or dynamically chosen from a range. 
 
-By default all interfaces are dual-homed with an LACP state of 'active'. Only the odd numbered switch needs to be specified in the variable file, configuration on the MLAG pair is automatically added.
+By default all interfaces are *dual-homed* with an LACP state of 'active'. The interface details only need to be defined for the odd numbered switch, configuration for both members for the MLAG pair is automatically generated.\
 The VPC number can not be changed, it will always be the same as the port-channel number.\
-If not using single-homed or dual-homed interfaces make sure the dictionary (*single_homed* or *dual_homed*) is hashed out.
+If not defining any single or dual-homed interfaces, the relevant dictionary (*single_homed* or *dual_homed*) must be hashed out.
 
-There are 5 types of interface that can be specified:
-- **access:** A L2 single VLAN access port. STP is set to 'edge'
-- **stp_trunk:** A L2 trunk port going to a device that supports STP. STP is set to 'network' so the other device must support *Brige Assurance*
-- **stp_trunk_non_ba:** Same as stp_trunk but sets STP will be set to 'normal' for devices that dont support BA
-- **non_stp_trunk:** A L2 trunk port going to a device that doesnt support BPDU. STP set to 'edge' and *BPDU Guard* enabled
-- **layer3:** A non-switchport L3 interface with an IP address. Must be single-homed as MLAG not supported
+There are 5 types of interface that can be defined:
+- **access:** A single VLAN Layer2 access port. STP is set to 'edge'
+- **stp_trunk:** A L2 trunk going to a device that supports STP. STP is set to 'network' meaning the other device must support *Bridge Assurance*
+- **stp_trunk_non_ba:** Same as stp_trunk except that STP is set to 'normal' to support devices that dont use BA
+- **non_stp_trunk:** A L2 trunk port going to a device that doesnt support BPDU. STP set to 'edge' with *BPDU Guard* enabled
+- **layer3:** A non-switchport L3 interface with an IP address. Must be single-homed as MLAG not supported for L3 interfaces
 
-Interfaces are defined as a dictionary value for the single_homed or dual-homed key. If not using single-homed or dual-homed interfaces make sure the dictionary (*single_homed* or *dual_homed*) is hashed out.\
-At a minimun the following settings need to be configured:
+At a minimum the following settings need to be configured:
 
-- single_homed: *or* dual-homed:
+- single_homed: *or* dual-homed:           *Hash out if not used*
   - descr: string
-  - type: access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3
-  - ip_vlan: vlan or ip            *Depends on the type, either ip/prefifx, vlan or multiple vlans separated by ,*
-  - switch: name            *Name of switch to create on. If dual-homed needs to be odd switch number from MLAG pair*
-  - tenant: name            *Layer3 interfaces only, is the VRF the interface will be in*
+  - type: specific_type                       *Either access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3*
+  - ip_vlan: vlan or ip                          *Depends on the type, either ip/prefix, vlan or multiple vlans separated by ,*
+  - switch: name                                *Switch creating on. If dual-homed needs to be odd switch number from MLAG pair*
+  - tenant: name                                *Layer3 interfaces only, is the VRF the interface will be in*
 
-To statically assign the interface and/or port-channel number (default is dynamically from a range) add either of these 2 extra dictionaries to the interface. The values used can overlap with the dynamic interface range however for simplicty would advise to use a separate range for dynamic and static assignments. 
+To statically assign the interface and/or port-channel number (default is dynamic) add either of these 2 extra dictionaries to the interface. The values used can overlap with the dynamic interface range however for simplicty it is probably advisable to use a separate range for the dynamic and static assignments. 
   - intf_num: integrar          *Only specify the number, name is got from the fbc.adv.bse_intf.intf_fmt variable*
-  - po_num: integrar          *Only specify the number, name is got from the fbc.adv.bse_intf.ec_fmt variable*
+  - po_num: integrar           *Only specify the number, name is got from the fbc.adv.bse_intf.ec_fmt variable*
 
-Under the advanced (*tnt.adv*) section of the variable file set the reserved range of interfaces to use:
+Under the advanced (*tnt.adv*) section of the variable file set the reserved range of interfaces to use for dynamic assignment:
 - adv:                            
-  - single_homed:            *Range used for single-homed interfaces*
+  - single_homed:                      *Range used for single-homed interfaces*
     - first_intf: integrar
     - last_intf: integrar
-  - dual_homed:            *Range used for dual-homed interfaces*
+  - dual_homed:                       *Range used for dual-homed interfaces*
     - first_intf: integrar
     - last_intf: integrar
     - first_po: integrar
     - last_po: integrar
 
-From the values in the *services_interface.yml* file an new per-device (border and leaf) data model is created by the *format_dm.py* custom filter plugin. An example of a data model is:
+From the values in the *services_interface.yml* file a new per-device (border and leaf) data model is created by the *format_dm.py* custom filter plugin. An example of the data model is shown below:
 ```bash
 {
     "descr": "L3 > DC1-SRV-MON01 nic1",
@@ -282,9 +281,9 @@ From the values in the *services_interface.yml* file an new per-device (border a
 ```
 
 ## Interface Cleanup - Defaulting Interfaces
-The interface cleanup role is required to make sure any interfaces not assigned by the fabric or the services (svc_intf) roles have a default configuration. Without this whenever an interface number is changed (for example a server moved to different interface) the old interface would not have its configuration put back to the default values.\
-This role goes through the interfaces assigned by the fabric and services role producing a list of used interfaces which are then subtracted from the list of all the switches interfaces (fbc.num_intf).\
-It has to be run after either of these roles so that it can know what interfaces have been assigned, therefore uses tags to ensure it is run any time either of these roles are run.
+The interface cleanup role is required to make sure any interfaces not assigned by the fabric or the services (svc_intf) role have a default configuration. Without this if an interface was to be changed (for example a server moved to different interface) the old interface would not have its configuration put back to the default values.
+
+This role goes through the interfaces assigned by the fabric and services role producing a list of used interfaces which are then subtracted from the list of all the switches interfaces (*fbc.num_intf*). It has to be run after either of these roles as it needs to know what interfaces have been assigned, therefore uses tags to ensure it is run any time either of these roles are run.
 
 ## Input validation
 Rather than validating any configuration on devices it validate the details entered in the variable files are correct .The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection.\
