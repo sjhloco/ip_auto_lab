@@ -2,14 +2,17 @@
 # This playbook is used to to deploy leaf and spine topology
 
 - name: "Deploy Leaf and Spine DC"
-  # hosts: all
-  hosts: DC1-N9K-BORDER01
+  hosts: all
+  # hosts: DC1-N9K-BORDER02
+  # hosts: DC1-N9K-LEAF01
+  # hosts: DC1-N9K-SPINE02
   connection: local
   vars_files:
     - vars/ansible.yml            # All varaibles start with ans.
     - vars/base.yml               # All varaibles start with bse.
     - vars/fabric.yml             # All varaibles start with fbc.
     - vars/services_tenant.yml    # All varaibles start with svc_tnt
+    - vars/services_interface.yml    # All varaibles start with svc_tnt
 
 ######################## 1. Validates the input data (in var_files) and creates the file strucuture ########################
   pre_tasks:
@@ -22,7 +25,7 @@
           that: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }} == 'base.yml unittest pass'"
           quiet: yes
           fail_msg: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }}"
-          # Uses a filter pluggin  input_validate to do the validating and returns the outcome to the Anisble assert module
+      # Uses a filter pluggin  input_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of fabric.yml"
         assert:
           that: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp,
@@ -30,7 +33,7 @@
           quiet: yes
           fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
                       fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
-        # Uses a filter pluggin  input_svc_validate to do the validating and returns the outcome to the Anisble assert module
+      # Uses a filter pluggin  input_svc_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of services_tenant.yml"
         assert:
           that: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }} == 'service_tenant.yml unittest pass'"
@@ -38,6 +41,33 @@
           fail_msg: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }}"
       run_once: true        # Doesnt need to run for every hosts as just validating files.
       tags: [pre_val, full]
+
+
+
+    # Uses a filter pluggin input_svc_validate to do the validating and returns the outcome to the Ansible assert module
+    - name: "Validate the contents of the variable files"
+      block:
+      - name: "SYS >> Validating the contents of services_interfaces.yml"
+        set_fact:
+          svc_intf_test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all) }}"
+      - debug:
+          var=svc_intf_test
+    # - debug:
+    #     msg: "{{ ansible_play_hosts_all }}"
+      # with_inventory_hostnames:
+      #   - all
+      run_once: true
+      tags: test
+      # assert:
+      #   that: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv) }} == 'service_interface.yml unittest pass'"
+      #   quiet: yes
+      #   fail_msg: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv) }}"
+
+
+
+
+
+
 
     # 1b. Create the file structure
     - name: "Create the localhost environment"
@@ -65,23 +95,27 @@
     - name: Builds the base config snippet
       import_role:
         name: base
-      tags: [bse, bse_fbc, full]
+      tags: [bse, bse_fbc, bse_fbc_svc, full]
     - name: Builds the fabric config snippet
       import_role:
         name: fabric
-      tags: [fbc, bse_fbc, full]
+      tags: [fbc, bse_fbc, bse_fbc_svc, full]
     - name: Builds the tenant config snippets
       import_role:
         name: services
         tasks_from: svc_tnt
-      tags: [tnt, full]
+      tags: [tnt, svc, bse_fbc_svc, full]
 
     - name: Builds the tenant config snippets
       import_role:
         name: services
         tasks_from: svc_intf
-      tags: [test]
+      tags: [intf, svc, bse_fbc_svc, full]
 
+    - name: Interface cleanup
+      import_role:
+        name: intf_cleanup
+      tags: [cln, fbc, bse_fbc, intf, bse_fbc_svc, full]
 
 ######################## 3. Join the config snippets into one file and deploy ########################
   # tasks:
@@ -93,7 +127,7 @@
         regexp: '\.conf$'           # Ensures only joins the files created by the roles
       changed_when: False           # Stops it reporting changes in playbook summary
       check_mode: False             # These tasks still make changes when in check mode
-      tags: [bse_fbc, full]
+      tags: [bse_fbc, bse_fbc_svc, full]
 
   # 3b. Replace the configuration on the devices with the config in the assembled config file
     - name: "NET >> Applying changes using replace config"
@@ -101,7 +135,7 @@
         provider: "{{ ans.creds_all }}"
         dev_os: "{{ ansible_network_os }}"
         # NXOS takes between 70 to 100 seconds to deploy all changes so defaul timesout needed increasing
-        timeout: 120
+        timeout: 180
         config_file: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/config.cfg"
         commit_changes: True            # Set to true as use Ansible check_mode to do dry runs
         replace_config: True            # Replacing config rather than merging

@@ -1,10 +1,32 @@
 1. Do the serivces_interfaces.yml
 2. do svc_intf role
+TEST deployment
+
 3. do pre-validation
 4. do post validation
 
 
+Change validation so seperate template per svc that are joined
+
+
+
+
+W
 Decide if want to do routing service????
+
+
+
+Pre=valu checsk:
+
+
+
+README
+Update tags, have now added bse_fbc_svc and svc
+
+
+
+
+
 
 
 
@@ -14,3 +36,11 @@ Nice to have
 2. Add EOS, thin kcan use this to get the config
 https://overlaid.net/2019/02/19/arista-bgp-evpn-ansible-lab/
 https://github.com/varnumd/ansible-arista-evpn-lab
+
+
+ADD to notes on filters:
+You can use facts (got from filters) in other as long as they are run before you try and reference it
+
+Add to notes, not sure where:
+    - debug:
+        msg: "{{ ansible_play_hosts_all }}"             see all hosts play is run on, lots more here https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html

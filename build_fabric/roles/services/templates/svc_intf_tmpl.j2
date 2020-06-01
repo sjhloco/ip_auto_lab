@@ -1,52 +1,60 @@
 {################################################# Service: Device Ports #################################################}
-
-{% for type, interfaces in svc_intf.items() %}
-{% for intf in interfaces %}
-interface {{ intf.num }}
+{% for intf in flt_svc_intf %}
+interface {{ intf.intf_num }}
   description {{ intf.descr }}
-{# Common config for all Layer3 ports #}
-{% if type == 'layer3' %}
+{% if intf.type == 'layer3' %}
   no switchport
-  vrf member {{ intf.vrf }}
+  vrf member {{ intf.tenant }}
   ip address {{ intf.ip_vlan }}
-{# Common config for all Layer2 ports #}
 {% else %}
-  switchport
+{# Common config for all Layer2 ports #}
   spanning-tree port type {{ intf.stp }}
+  !#switchport
 {# Layer2 Access port config #}
-{% endif %}{% if type == 'access' %}
-  switchport mode access
+{% if intf.type == 'access' %}
   switchport access vlan {{ intf.ip_vlan }}
-{# Layer2 Trunk port config #}
-{% elif 'trunk' in type %}
-  switchport mode trunk
-  switchport trunk allowed vlan {{ intf.ip_vlan  }}
-{% endif %}{% if type == 'non_stp_trunk' %}
-  spanning-tree bpduguard enable
-{# Dual_homed ports are a port_channel #}
-{% endif %}{% if intf.dual_homed is sameas true  %}
-  channel-group {{ intf.po_num }} force mode {{ intf.po_mode }}
+{# Layer2 single-homed access port config #}
+{% if intf.dual_homed is sameas false %}
+  !#switchport trunk allowed vlan 1-4094
+  switchport mode access
+{# Layer2 port-channel access port config #}
+{% endif %}{% if fbc.adv.bse_intf.ec_fmt in intf.intf_num %}
+  !#switchport trunk allowed vlan 1-4094
+  switchport mode access
   vpc {{ intf.vpc_num }}
-{% endif %}
+{# Layer2 Trunk port config #}
+{% endif %}{% elif 'trunk' in intf.type %}
+{% if intf.type == 'non_stp_trunk' %}
+  spanning-tree bpduguard enable
+{# Layer2 single-homed trunk port config #}
+{% endif %}{% if intf.dual_homed is sameas false %}
+  switchport trunk allowed vlan {{ intf.ip_vlan  }}
+  switchport mode trunk
+{# Layer2 port-channel trunk port config #}
+{% endif %}{% if fbc.adv.bse_intf.ec_fmt in intf.intf_num %}
+  switchport trunk allowed vlan {{ intf.ip_vlan  }}
+  switchport mode trunk
+  vpc {{ intf.vpc_num }}
+{# All Layer2 dual-homed ports #}
+{% endif %}{% endif %}{% if intf.dual_homed is sameas true %}
+  channel-group {{ intf.po_num }} force mode {{ intf.po_mode }}
+{% endif %}{% endif %}
   no shutdown
 
-{% endfor %}{% endfor %}
+{% endfor %}
 
-
-{% if port.ospf is defined and device_name.border_name in port.switch %}
+{# {% if port.ospf is defined and device_name.border_name in port.switch %}
   ip ospf hello-interval {{ port.ospf[1] }}
   no ip ospf passive-interface
-{# Required to get OSPF area #}
 {% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
 {% if port.ospf[0] == ospf.pro %}
 {% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
   ip router ospf {{ port.ospf[0] }} area {{ ospf.area }}
 {% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
-{# adds 1 to the area #}
   ip router ospf {{ port.ospf[0] }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
 {% endif %}{% endif %}
 {% endfor %}{% endif %}{% endfor %}
 {% endif %}{% endif %}
   no shutdown
 !
-{% endif %}{% endfor %}
+{% endif %}{% endfor %} #}

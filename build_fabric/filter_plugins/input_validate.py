@@ -42,7 +42,8 @@ class FilterModule(object):
         return {
             'input_bse_validate': self.base,
             'input_fbc_validate': self.fabric,
-            'input_svc_tnt_validate': self.svc_tnt
+            'input_svc_tnt_validate': self.svc_tnt,
+            'input_svc_intf_validate': self.svc_intf
         }
 
 ############  Validate formatting of variables within the base.yml file ############
@@ -203,7 +204,7 @@ class FilterModule(object):
             return fabric_errors
 
 
-############ Validate formatting of variables within the base.yml file ############
+############ Validate formatting of variables within the service_tenant.yml file ############
     def svc_tnt(self, svc_tnt, adv):
         svc_tnt_errors = ['Check the contents of services_tenant.yml for the following issues:']
 
@@ -295,3 +296,125 @@ class FilterModule(object):
             return "'service_tenant.yml unittest pass'"             # For some reason ansible assert needs the inside quotes
         else:
             return svc_tnt_errors
+
+
+############ Validate formatting of variables within the service_interface.yml file ############
+    def svc_intf(self, svc_intf, adv, hosts):
+        svc_intf_errors = ['Check the contents of services_interface.yml for the following issues:']
+
+        for homed, interfaces in svc_intf.items():
+            for intf in interfaces:
+
+                # SWITCH_NAME (svc_intf.intf.homed.switch): Ensures that it is a valid device name within inventary_hostnames and odd numbered if dual-homed
+                try:
+                    assert intf['switch'] in hosts, "-svc_intf.intf.homed.switch name {} is not an inventory_hostname".format(intf['switch'])
+                except AssertionError as e:
+                    svc_intf_errors.append(str(e))
+                if homed == 'dual_homed':
+                    assert intf['switch'][-2:] ==
+
+
+
+
+
+            return svc_intf_errors
+    #             # Adds homed as a dict and adds some default value dicts
+    #             intf.setdefault('intf_num', None)
+    #             if homed == 'single_homed':
+    #                 intf['dual_homed'] = False
+    #             elif homed == 'dual_homed':
+    #                 intf['dual_homed'] = True
+    #                 intf.setdefault('po_mode', 'active')
+    #                 intf.setdefault('po_num', None)
+    #             # STP dict is added based on Layer2 port type
+    #             if intf['type'] == 'access':
+
+
+    #             elif intf['type'] == 'stp_trunk':
+
+    #             elif intf['type'] == 'stp_trunk_non_ba':
+
+    #             elif intf['type'] == 'non_stp_trunk':
+
+
+
+    # single_homed:
+    #   - descr: L3 > DC1-ASAv-XFW01 eth1
+    #     type: layer3
+    #     tenant: RED
+    #     ip_vlan: 10.255.99.1/30
+    #     switch: DC1-N9K-BORDER01
+    #     intf_num: 46
+    #   - descr: L3 > DC1-ASAv-XFW02 eth1
+    #     type: layer3
+    #     tenant: RED
+    #     ip_vlan: 10.255.99.5/30
+    #     switch: DC1-N9K-BORDER02
+    #   - descr: L3 > DC1-SRV-MON01 nic1
+    #     type: layer3
+    #     tenant: BLU
+    #     ip_vlan: 10.100.100.21/30
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: ACCESS > DC1-SRV-APP01 eth1
+    #     type: access
+    #     ip_vlan: 10
+    #     switch: DC1-N9K-LEAF02
+    #   - descr: UPLINK > DC1-VIOS-SW3
+    #     type: stp_trunk
+    #     ip_vlan: 110,120
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: UPLINK > DC1-VIOS-SW4
+    #     type: stp_trunk_non_ba
+    #     ip_vlan: 90
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: ACCESS >DC1-LTM-LB02
+    #     type: non_stp_trunk
+    #     ip_vlan: 30
+    #     switch: DC1-N9K-LEAF02
+
+    # dual_homed:
+    #   - descr: ACCESS >DC1-SRV-APP01 eth1
+    #     type: access
+    #     ip_vlan: 10
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: ACCESS >DC1-SRV-PRD01 eth1
+    #     type: access
+    #     ip_vlan: 20
+    #     switch: DC1-N9K-LEAF01
+    #     intf_num: 45
+    #     po_num: 14
+    #   - descr: UPLINK > DC1-VIOS-SW1
+    #     type: stp_trunk
+    #     ip_vlan: 110,120
+    #     switch: DC1-N9K-LEAF01
+    #   - descr: UPLINK > DC1-VIOS-SW2
+    #     type: stp_trunk_non_ba
+    #     ip_vlan: 90
+    #     switch: DC1-N9K-LEAF01
+    #     intf_num: 15
+    #   - descr: ACCESS >DC1-LTM-LB01
+    #     type: non_stp_trunk
+    #     ip_vlan: 30
+    #     switch: DC1-N9K-LEAF01
+    #     intf_num: 25
+    #   - descr: UPLINK > DC1-LTM-ESX1
+    #     type: non_stp_trunk
+    #     ip_vlan: 10,20,24,30,40
+    #     switch: DC1-N9K-LEAF01
+    #     po_num: 66
+    #   - descr: UPLINK > DC1-VIOS-DMZ01
+    #     type: stp_trunk_non_ba
+    #     ip_vlan: 110,120
+    #     switch: DC1-N9K-BORDER01
+
+
+# valid IP
+# Thta host is odd number host
+# that the int raneg adn po range the same number of avaiable interfaces (difference)
+# That the int range is not less than the number of interfaces
+# Are vlans or tenants alreadyt on a switch
+# What happens if dont ahve any config in services_interfaces?
+# Cant be a space between vlans in trunk ports as will casue it to fail
+# if no single or dual homed interfaces the header is hashed out
+# Layer 3 can never be dual homed
+# add check for base max_intf

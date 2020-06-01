@@ -50,6 +50,7 @@ var_dicts:
     - addr                              # Address ranges the devices IPs are created from. Loopback must be /32
   fabric:
     - network_size                      # Dictates number of inventory objects created for each device role
+    - num_intf                          # Number of the first and last interface on the switch
     - bse_intf                          # Naming and increments for the fabric interfaces
     - lp                                # Loopback interface naming and descriptions
     - mlag                              # Holds the peer link Port-Channel number
@@ -209,15 +210,18 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                 for sp in self.spine:
                     self.inventory.add_host(sp, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['spine_os'])
+                    self.inventory.set_variable(gr, 'num_intf', self.num_intf['spine'])
             if gr in self.device_name['border'].lower():
                 for br in self.border:
                     self.inventory.add_host(br, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['border_os'])
+                    self.inventory.set_variable(gr, 'num_intf', self.num_intf['border'])
 
             if gr in self.device_name['leaf'].lower():
                 for lf in self.leaf:
                     self.inventory.add_host(lf, gr)
                     self.inventory.set_variable(gr, 'ansible_network_os', self.device_type['leaf_os'])
+                    self.inventory.set_variable(gr, 'num_intf', self.num_intf['leaf'])
 
         #5b. Adds host_vars for all the IP dictionaries created in 'create_ip' method
         for host, mgmt_ip in self.all_mgmt.items():
@@ -266,6 +270,8 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
                     self.addr = all_vars[file_name]['bse'][each_var]
                 elif each_var == 'network_size':
                     self.network_size = all_vars[file_name]['fbc'][each_var]
+                elif each_var == 'num_intf':
+                    self.num_intf = all_vars[file_name]['fbc'][each_var]
                 elif each_var == 'bse_intf':
                     self.bse_intf = all_vars[file_name]['fbc']['adv'][each_var]
                 elif each_var == 'lp':
