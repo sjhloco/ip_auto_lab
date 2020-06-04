@@ -231,9 +231,9 @@ At a minimum the following settings need to be configured:
 - single_homed: *or* dual-homed:           *Hash out if not used*
   - descr: string
   - type: specific_type                       *Either access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3*
-  - ip_vlan: vlan or ip                          *Depends on the type, either ip/prefix, vlan or multiple vlans separated by ,*
-  - switch: name                                *Switch creating on. If dual-homed needs to be odd switch number from MLAG pair*
-  - tenant: name                                *Layer3 interfaces only, is the VRF the interface will be in*
+  - ip_vlan: vlan or ip                          *Depends on the type, either ip/prefix (string), vlan (integrar) or multiple vlans separated by , (string)*
+  - switch: string                                *Switch creating on. If dual-homed needs to be odd switch number from MLAG pair*
+  - tenant: string                                *Layer3 interfaces only, is the VRF the interface will be in*
 
 To statically assign the interface and/or port-channel number (default is dynamic) add either of these 2 extra dictionaries to the interface. The values used can overlap with the dynamic interface range however for simplicty it is probably advisable to use a separate range for the dynamic and static assignments. 
   - intf_num: integrar          *Only specify the number, name is got from the fbc.adv.bse_intf.intf_fmt variable*
