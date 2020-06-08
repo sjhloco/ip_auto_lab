@@ -1,27 +1,17 @@
-1. Do the serivces_interfaces.yml
-2. do svc_intf role
-TEST deployment
-
 3. do pre-validation
+Create test var file for to be used for each pre-val type
+DRY each pre-val type by eliminating as amhy duplicates as possible.
+Start by doing for first pre-val section. Once thats done move onto next using methods created for first one.
+Add notes about what pre-val sectiosn methods are used for
+
+
+
+
+
 4. do post validation
-
-
 Change validation so seperate template per svc that are joined
 
-
-
-
-W
-Decide if want to do routing service????
-
-
-
-Pre=valu checsk:
-
-
-
-README
-Update tags, have now added bse_fbc_svc and svc
+5, Update tags, have now added bse_fbc_svc and svc
 
 
 
@@ -44,3 +34,28 @@ You can use facts (got from filters) in other as long as they are run before you
 Add to notes, not sure where:
     - debug:
         msg: "{{ ansible_play_hosts_all }}"             see all hosts play is run on, lots more here https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
+
+
+DO nexus notes
+
+add this to my dict notes to append to dict value ratehr than over righting it
+
+In [93]: from collections import defaultdict
+
+In [94]: b = defaultdict(list)
+
+In [95]: for x in a:
+    ...:     b[x['switch']].append(x['ip_vlan'])
+
+
+to combine 2 dicts with same values:
+        dd = {defaultdict(list)}
+
+        for d in (sh_per_dev_intf, dh_per_dev_intf):
+            for key, value in d.items():
+                dd[key].extend(value)
+        return dd
+
+to merge 2 dics with diff vlaues
+This is generally considered a trick in Python where a single expression is used to merge two dictionaries and stored in a third dictionary. The single expression is **. This does not affect the other two dictionaries. ** implies that the argument is a dictionary. Using ** [double star] is a shortcut that allows you to pass multiple arguments to a function directly using a dictionary. For more information refer **kwargs in Python. Using this we first pass all the elements of the first dictionary into the third one and then pass the second dictionary into the third. This will replace the duplicate keys of the first dictionary.
+z = {**dict1, **dict2}

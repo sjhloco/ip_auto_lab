@@ -28,10 +28,10 @@
       # Uses a filter pluggin  input_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of fabric.yml"
         assert:
-          that: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp,
+          that: "{{ fbc.network_size | input_fbc_validate(fbc.num_intf, fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp,
                    fbc.adv.mlag, fbc.adv.addr_incre) }} == 'fabric.yml unittest pass'"
           quiet: yes
-          fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
+          fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.num_intf, fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
                       fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
       # Uses a filter pluggin  input_svc_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of services_tenant.yml"
@@ -49,7 +49,7 @@
       block:
       - name: "SYS >> Validating the contents of services_interfaces.yml"
         set_fact:
-          svc_intf_test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all) }}"
+          svc_intf_test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
       - debug:
           var=svc_intf_test
     # - debug:

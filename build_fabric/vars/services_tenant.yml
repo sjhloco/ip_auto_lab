@@ -38,6 +38,7 @@ svc_tnt:
           ipv4_bgp_redist: False
         - num: 40
           name: ha_keepalive
+          create_on_leaf: False
 
     - tenant_name: GRN
       l3_tenant: True

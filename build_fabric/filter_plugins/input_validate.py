@@ -9,6 +9,7 @@ bse.addr: Ensures that the network addresses entered are valid networks (or IP f
 
 -core fabric configuration variables  using fabric.yml
 fbc.network_size: Ensures the number of each type of device is within the limits and constraints
+fbc.num_intf: Ensures is one number, then a comma and then upto 3 numbers
 fbc.ospf: Ensures that the OSPF process is present and area in dotted decimal format
 fbc.bgp.as_num: Ensures that the AS is present, cant make more specific incase is 2-byte or 4-byte ASNs
 fbc.acast_gw_mac: Ensures the anycast virtual MAC is a valid mac address
@@ -31,10 +32,26 @@ svc_tnt.tnt.vlans.num: Ensures all the VLAN numbers are unique, no duplicates
 svc_tnt.adv.bse_vni): Ensures all values are integers
 svc_tnt.adv.bgp.ipv4_redist_rm_name: Ensures that it contains both 'vrf' and 'as'
 
+-Interfaces (single_homed, dual_homed & port-channels) using interfaces_tenant.yml
+svc_intf.intf.homed: Ensures that single-homed or dual-homed dictionaries are not empty
+svc_intf.intf.homed.intf_num: Ensures that intf_num is integrar (also added to a new list to check interface assignment)
+svc_intf.intf.homed.po_num: Ensures that po_num is integrar (also added to a new list to check interface assignment)
+svc_intf.intf.homed.switch: Ensures that it is a valid device name within inventary_hostnames and the hostname is odd numbered if dual-homed
+svc_intf.intf.single_homed.ip_vlan: Ensures that the the IP address is in a valid IPv4 format
+svc_intf.intf.homed.ip_vlan: Ensures all VLANs are integrers (numbers)
+svc_intf.intf.homed.ip_vlan: Ensures that there are no whitespaces and each vlan is an integrer (number)
+VRF/VLAN: Ensures that the VRF or VLAN of the interfaces being configured on are on the switches they are being configured on
+svc_intf.adv.homed.first/last: Ensures that the reserved interface and Port-Channel ranges are integrers
+vc_intf.intf.single_homed: Ensures are enough free ports in the range (range minus conflicting static assignments) for number of interfaces defined
+svc_intf.intf.dual_homed: Ensures are enough free ports in the range (range minus conflicting static assignments) for number of interfaces defined
+svc_intf.intf.dual_homed: Ensures are enough free port-channels in the range (range minus conflicting static assignments) for number of port-channels defined
+TOTAL_INTF: Make sure that are not more defined interfaces (single and dual_homed) than there are actual interfaces on the switch
+
 """
 
 import re
 import ipaddress
+from collections import defaultdict
 
 
 class FilterModule(object):
@@ -45,6 +62,32 @@ class FilterModule(object):
             'input_svc_tnt_validate': self.svc_tnt,
             'input_svc_intf_validate': self.svc_intf
         }
+
+
+
+############  Generic assert functions used by all classes to make DRY ############
+# DEFO can do integrers and regex (search and match)
+
+    # def re_search(regex, input, msg):
+    #     try:
+    #         assert re.search(regex, input), msg
+    #     except AssertionError as e:
+    #         errors.append(str(e))
+
+    #     re_search('-[a-zA-Z0-9_]+$', name, "-bse.device_name.{} format ({}) is not correct. Anything after " \
+    #                  "the last '-' is used for the group name so must be letters, digits or underscore".format(dvc, name))
+
+
+        # Used to assert any integrer !!!!! MAYBE ADD AS GENERIC ONE FOR ALL and also for IP addresses ????
+        # def assert_integrer(value, path):
+        #     try:
+        #         assert isinstance(value, int), "-{} '{}' should be an integrer numerical value".format(path, value)
+        #     except AssertionError as e:
+        #         svc_intf_errors.append(str(e))
+
+
+
+
 
 ############  Validate formatting of variables within the base.yml file ############
     def base(self, device_name, addr, users):
@@ -88,16 +131,15 @@ class FilterModule(object):
 
 
 ############ Validate formatting of variables within the fabric.yml file ############
-    def fabric(self, network_size, route, acast_gw_mac, bse_intf, lp, mlag, addr_incre):
+    def fabric(self, network_size, num_intf, route, acast_gw_mac, bse_intf, lp, mlag, addr_incre):
         fabric_errors = ['Check the contents of fabric.yml for the following issues:']
 
-        # 1. NETWORK_SIZE (fbc.network_size): Ensures thye are integers and the number of each type of device is within the limits and constraints
+        # NETWORK_SIZE (fbc.network_size): Ensures they are integers and the number of each type of device is within the limits and constraints
         for dev_type, net_size in network_size.items():
             try:
-                assert type(net_size) == int, "-fbc.network_size.{} should be a numerical value".format(dev_type)
+                assert type(net_size) == int, "-fbc.network_size.{} should be an integrer numerical value".format(dev_type)
             except AssertionError as e:
                 fabric_errors.append(str(e))
-
         try:
             assert re.match('[1-4]', str(network_size['num_spines'])), "-fbc.network_size.num_spines is {}, valid values are 1 to 4".format(network_size['num_spines'])
         except AssertionError as e:
@@ -111,7 +153,14 @@ class FilterModule(object):
         except AssertionError as e:
             fabric_errors.append(str(e))
 
-        # 2. OSPF (fbc.ospf): Ensures that the OSPF process is present and area in dotted decimal format
+        # NUMBER_INTERFACES (fbc.num_intf): Ensures is one number, then a comma and then upto 3 numbers
+        for dev_type, intf in num_intf.items():
+            try:
+                assert re.match(r'^\d,\d{1,3}$', str(intf)), "-fbc.num_intf.{} {} is not a valid format".format(dev_type, intf)
+            except AssertionError as e:
+                fabric_errors.append(str(e))
+
+        # OSPF (fbc.ospf): Ensures that the OSPF process is present and area in dotted decimal format
         try:
             assert route['ospf']['pro'] != None ,"-fbc.route.ospf.pro does not have a value, this needs to be a string or integrer"
         except AssertionError as e:
@@ -121,13 +170,13 @@ class FilterModule(object):
         except ipaddress.AddressValueError:
             fabric_errors.append("-fbc.route.ospf.area ({}) is not a valid dotted decimal area, valid values are 0.0.0.0 to 255.255.255.255".format(route['ospf']['area']))
 
-        # 3. BGP (fbc.bgp.as_num): Ensures that the AS is present, cant make more specific incase is 2-byte or 4-byte ASNs
+        # BGP (fbc.bgp.as_num): Ensures that the AS is present, cant make more specific incase is 2-byte or 4-byte ASNs
         try:
             assert type(route['bgp']['as_num']) != None, "-fbc.route.bgp.as_num does not have a value"
         except AssertionError as e:
             fabric_errors.append(str(e))
 
-        # 4. ACAST_GW_MAC (fbc.acast_gw_mac): Ensures the anycast virtual MAC is a valid mac address
+        # ACAST_GW_MAC (fbc.acast_gw_mac): Ensures the anycast virtual MAC is a valid mac address
         try:
             assert re.match(r'([0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}', acast_gw_mac), \
                             "-fbc.acast_gw_mac ({}) is not a valid, can be [0-9], [a-f] or [A-F] in the format xxxx.xxxx.xxxx".format(acast_gw_mac)
@@ -138,7 +187,7 @@ class FilterModule(object):
         for name, intf in bse_intf.items():
             if '_to_' in name:
                 try:
-                    assert type(intf) == int, "-fbc.adv.bse_intf.{} should be a numerical value".format(name)
+                    assert type(intf) == int, "-fbc.adv.bse_intf.{} should be an integrer numerical value".format(name)
                 except AssertionError as e:
                     fabric_errors.append(str(e))
             elif 'mlag_peer' == name:
@@ -166,7 +215,7 @@ class FilterModule(object):
         # MLAG (fbc.adv.mlag): Ensures all of MLAG paraemters are integers and VLANs within limit
         for mlag_attr, value in mlag.items():
             try:
-                assert type(value) == int, "-fbc.adv.mlag.{} should be a numerical value".format(mlag_attr)
+                assert type(value) == int, "-fbc.adv.mlag.{} should be an integrer numerical value".format(mlag_attr)
             except AssertionError as e:
                 fabric_errors.append(str(e))
         try:
@@ -178,7 +227,7 @@ class FilterModule(object):
         # ADDR_INCRE (fbc.adv.addr_incre): Ensures all of the IP address increment values used are integers and except for mlag peering are all unique
         for incr_type, incr in addr_incre.items():
             try:
-                assert type(incr) == int, "-ffbc.adv.addr_incre.{} should be a numerical value".format(incr_type)
+                assert type(incr) == int, "-ffbc.adv.addr_incre.{} should be an integrer numerical value".format(incr_type)
             except AssertionError as e:
                 fabric_errors.append(str(e))
 
@@ -234,7 +283,7 @@ class FilterModule(object):
             for vl in tnt['vlans']:
                 # VLAN_NUMBER (svc_tnt.tnt.vlans.num): Ensures all VLANs are numbers and not conflicting
                 try:
-                    assert isinstance(vl['num'], int), "-svc_tnt.tnt.vlans.num VLAN '{}' should be a numerical value".format(vl['num'])
+                    assert isinstance(vl['num'], int), "-svc_tnt.tnt.vlans.num VLAN '{}' should be an integrer numerical value".format(vl['num'])
                 except AssertionError as e:
                     svc_tnt_errors.append(str(e))
 
@@ -260,7 +309,7 @@ class FilterModule(object):
 
                 # IP_ADDR (svc_tnt.tnt.vlans.ip_addr): Ensures that the IP address is of the correct format
                 try:
-                    ipaddress.IPv4Interface(vl['ip_addr']).ip
+                    ipaddress.IPv4Interface(vl['ip_addr'])
                 except ipaddress.AddressValueError:
                     svc_tnt_errors.append("-svc_tnt.tnt.vlans.ip_addr ({}) is not a valid IPv4 address".format(vl['ip_addr']))
 
@@ -280,7 +329,7 @@ class FilterModule(object):
         # BASE_VNI (svc_tnt.adv.bse_vni): Ensures all values are integers
         for opt in ['tnt_vlan', 'l3vni', 'l2vni']:
             try:
-                assert isinstance(adv['bse_vni'][opt], int), "-adv.bse_vni.{} ({}) should be a numerical value".format(opt, adv['bse_vni'][opt])
+                assert isinstance(adv['bse_vni'][opt], int), "-adv.bse_vni.{} ({}) should be an integrer numerical value".format(opt, adv['bse_vni'][opt])
             except AssertionError as e:
                 svc_tnt_errors.append(str(e))
 
@@ -299,122 +348,195 @@ class FilterModule(object):
 
 
 ############ Validate formatting of variables within the service_interface.yml file ############
-    def svc_intf(self, svc_intf, adv, hosts):
+
+    def svc_intf(self, svc_intf, adv, hosts, tenants, dev_name, num_intf):
+        sh_per_dev_intf, dh_per_dev_intf, per_dev_po, per_dev_intf = (defaultdict(list) for i in range(4))
+        tnt_on_border, tnt_on_leaf, intf_on_border, intf_on_leaf, sh_intf, dh_intf, po_intf = ([] for i in range(7))
         svc_intf_errors = ['Check the contents of services_interface.yml for the following issues:']
 
-        for homed, interfaces in svc_intf.items():
-            for intf in interfaces:
+        # Used in svc_intf, gets a list of what VRFs and VLANs are to be created on leafs and borders switches (got from services_interface.yml
+        def vrf_vlan_list(switch, info):
+            if dev_name['leaf'] in switch:
+                intf_on_leaf.append(info)
+            elif dev_name['border'] in switch:
+                intf_on_border.append(info)
 
-                # SWITCH_NAME (svc_intf.intf.homed.switch): Ensures that it is a valid device name within inventary_hostnames and odd numbered if dual-homed
+         # List what VRFs and VLANs are on leafs and borders switches (got from services.tenant.yml)
+        for tnt in tenants:
+            for vl in tnt['vlans']:
+                if vl.get('create_on_leaf') != False:
+                    tnt_on_leaf.extend([tnt['tenant_name'], vl['num']])
+                if vl.get('create_on_border') == True:
+                    tnt_on_border.extend([tnt['tenant_name'], vl['num']])
+
+
+        for homed, interfaces in svc_intf.items():
+            # HOMED (svc_intf.intf.homed): Ensures that single-homed or dual-homed dictionaries are not empty
+            try:
+                assert interfaces != None, "-svc_intf.intf.{0} should not be empty, if it is not used hash out '{0}'".format(homed)
+            except AssertionError as e:
+                svc_intf_errors.append(str(e))
+                return svc_intf_errors              # Has to exit script here as Nonetype breaks rest of it
+
+            for intf in interfaces:
+                # INTF_NUM (svc_intf.intf.homed.intf_num): Ensures that intf_num is integrar (also added to a new list to check interface assignment)
+                if intf.get('intf_num') != None:
+                    try:
+                        assert isinstance(intf['intf_num'], int), "-svc_intf.intf.homed.intf_num '{}' should be an integrer numerical value".format(intf['intf_num'])
+                        # all_custom_intf.append(intf['intf_num'])
+                    except AssertionError as e:
+                        svc_intf_errors.append(str(e))
+                # PO_NUM (svc_intf.intf.po_num): Ensures that po_num is integrar (also added to a new list to check interface assignment)
+                if intf.get('po_num') != None:
+                    try:
+                        assert isinstance(intf['po_num'], int), "-svc_intf.intf.homed.po_num '{}' should be an integrer numerical value".format(intf['po_num'])
+                        # all_custom_po.append(intf['po_num'])
+                    except AssertionError as e:
+                        svc_intf_errors.append(str(e))
+
+                # SWITCH_NAME (svc_intf.intf.homed.switch): Ensures that it is a valid device name within inventory_hostnames and the hostname is odd numbered if dual-homed
                 try:
-                    assert intf['switch'] in hosts, "-svc_intf.intf.homed.switch name {} is not an inventory_hostname".format(intf['switch'])
+                    assert intf['switch'] in hosts, "-svc_intf.intf.homed.switch '{}' is not an inventory_hostname".format(intf['switch'])
                 except AssertionError as e:
                     svc_intf_errors.append(str(e))
                 if homed == 'dual_homed':
-                    assert intf['switch'][-2:] ==
+                    try:
+                        assert int(intf['switch'][-2:]) % 2 != 0, "-svc_intf.intf.dual_homed.switch '{}' should be an odd numbered MLAG switch".format(intf['switch'])
+                    except AssertionError as e:
+                        svc_intf_errors.append(str(e))
+                    # HOMED_TYPE (svc_intf.intf.dual_homed.type): Ensures that it is not a Layer3 port, can only have single-homed Layer 3 ports
+                    if intf['type'] == 'layer3':
+                        svc_intf_errors.append("-svc_intf.intf.dual_homed.type Layer3 port ({}) cant be dual-homed, it must be single-homed".format(intf['descr']))
 
+                # IP (svc_intf.intf.single_homed.ip_vlan): Ensures that the the IP address is in a valid IPv4 format
+                if intf['type'] == 'layer3':
+                    try:
+                        ipaddress.IPv4Interface(intf['ip_vlan'])
+                    except ipaddress.AddressValueError:
+                        svc_intf_errors.append("-svc_intf.intf.single_homed.ip_vlan {} is not a valid IPv4 address".format(intf['ip_vlan']))
+                    vrf_vlan_list(intf['switch'], intf['tenant'])
 
+                # ACCESS_VLAN (svc_intf.intf.homed.ip_vlan): Ensures all VLANs are integrers (numbers)
+                elif intf['type'] == 'access':
+                    try:
+                        assert isinstance(intf['ip_vlan'], int), "-svc_intf.intf.homed.ip_vlan VLAN '{}' should be an integrer numerical value".format(intf['ip_vlan'])
+                    except AssertionError as e:
+                        svc_intf_errors.append(str(e))
+                    vrf_vlan_list(intf['switch'], intf['ip_vlan'])
 
+                # TRUNK_VLAN (svc_intf.intf.homed.ip_vlan): Ensures that there are no whitespaces and each vlan is an integrer (number)
+                else:
+                    try:
+                        assert re.search(r'\s', str(intf['ip_vlan'])) == None, "-svc_intf.intf.homed.ip_vlan '{}' should not have any whitespaces in it".format(intf['ip_vlan'])
+                    except AssertionError as e:
+                        svc_intf_errors.append(str(e))
+                    if ',' in str(intf['ip_vlan']):
+                        list_ip_vlan = intf['ip_vlan'].split(',')
+                        for vlan in list_ip_vlan:
+                            try:
+                                int(vlan)
+                                vrf_vlan_list(intf['switch'], int(vlan))
+                            except:
+                                svc_intf_errors.append("-svc_intf.intf.homed.ip_vlan VLAN{} should be an integrer numerical value".format(vlan))
+                    else:
+                        vrf_vlan_list(intf['switch'], intf['ip_vlan'])
 
+                # Gets number of Interfaces per device and any static interface/PO given
+                if homed == 'single_homed':
+                    sh_per_dev_intf[intf['switch']].append(intf.get('intf_num', 'dummy'))
+                elif homed == 'dual_homed':
+                    switch_pair = intf['switch'][:-2]+ "{:02d}".format(int(intf['switch'][-2:]) +1)
+                    dh_per_dev_intf[intf['switch']].append(intf.get('intf_num', 'dummy'))
+                    dh_per_dev_intf[switch_pair].append(intf.get('intf_num', 'dummy'))
+                    per_dev_po[intf['switch']].append(intf.get('po_num', 'dummy'))
+                    per_dev_po[switch_pair].append(intf.get('po_num', 'dummy'))
 
-            return svc_intf_errors
-    #             # Adds homed as a dict and adds some default value dicts
-    #             intf.setdefault('intf_num', None)
-    #             if homed == 'single_homed':
-    #                 intf['dual_homed'] = False
-    #             elif homed == 'dual_homed':
-    #                 intf['dual_homed'] = True
-    #                 intf.setdefault('po_mode', 'active')
-    #                 intf.setdefault('po_num', None)
-    #             # STP dict is added based on Layer2 port type
-    #             if intf['type'] == 'access':
+        # VRF/VLAN: Ensures that the VRF or VLAN of the interfaces being configured on are on the switches they are being configured on
+        miss_on_lf = set(intf_on_leaf) - set(tnt_on_leaf)
+        miss_on_bdr = set(intf_on_border) - set(tnt_on_border)
+        try:
+            assert len(miss_on_lf) == 0, "VRF or VLANs {} are not on leaf switches but are in leaf interface configurations".format(list(miss_on_lf))
+        except AssertionError as e:
+            svc_intf_errors.append(str(e))
+        try:
+            assert len(miss_on_bdr) == 0, "VRF or VLANs {} are not on border switches but are in border interface configurations".format(list(miss_on_bdr))
+        except AssertionError as e:
+            svc_intf_errors.append(str(e))
 
+        for homed, intf in adv.items():
+            # INTF_RANGE (svc_intf.adv.homed.first/last): Ensures that the reserved interface and Port-Channel ranges are integrers
+            for intf_pos, num in intf.items():
+                try:
+                    assert isinstance(num, int), "-svc_intf.adv.{}.{} '{}' should be an integrer numerical value".format(homed, intf_pos, num)
+                except AssertionError as e:
+                    svc_intf_errors.append(str(e))
 
-    #             elif intf['type'] == 'stp_trunk':
+            # Create list of all interfaces in the reserved ranges
+            if homed == 'single_homed':
+                for intf_num in range(intf['first_intf'], intf['last_intf'] + 1):
+                     sh_intf.append(intf_num)
+            if homed == 'dual_homed':
+                for intf_num in range(intf['first_intf'], intf['last_intf'] + 1):
+                     dh_intf.append(intf_num)
+                for po_num in range(intf['first_po'], intf['last_po'] + 1):
+                     po_intf.append(po_num)
 
-    #             elif intf['type'] == 'stp_trunk_non_ba':
+        # SH_INTF_RANGE (svc_intf.intf.single_homed): Ensures are enough free ports in the range (range minus conflicting static assignments) for number of interfaces defined
+        for switch, intf in sh_per_dev_intf.items():
+            used_intf = len(intf)
+            aval_intf = []
+            for x in intf:                      # Gets only the statically defined interface numbers
+                if x != 'dummy':
+                    aval_intf.append(x)
+            aval_intf.extend(sh_intf)           # Adds range of intfs to static intfs
+            total_intf = len(set(aval_intf))    # Removes duplicate intfs to find how many avaiable interfaces from range
+            try:
+                assert used_intf <= total_intf, "-Are more defined single-homed interfaces ({}) than free interfaces in reserved range ({}) on {}".format(used_intf, total_intf, switch)
+            except AssertionError as e:
+                svc_intf_errors.append(str(e))
 
-    #             elif intf['type'] == 'non_stp_trunk':
+        # DH_INTF_RANGE (svc_intf.intf.dual_homed): Ensures are enough free ports in the range (range minus conflicting static assignments) for number of interfaces defined
+        for switch, intf in dh_per_dev_intf.items():
+            used_intf = len(intf)
+            aval_intf = []
+            for x in intf:
+                if x != 'dummy':
+                    aval_intf.append(x)
+            aval_intf.extend(dh_intf)
+            total_intf = len(set(aval_intf))
+            try:
+                assert used_intf <= total_intf, "-Are more defined dual-homed interfaces ({}) than free interfaces in reserved range ({}) on {}".format(used_intf, total_intf, switch)
+            except AssertionError as e:
+                svc_intf_errors.append(str(e))
 
+        # PO_INTF_RANGE (svc_intf.intf.dual_homed): Ensures are enough free port-channels in the range (range minus conflicting static assignments) for number of port-channels defined
+        for switch, intf in per_dev_po.items():
+            used_intf = len(intf)
+            aval_intf = []
+            for x in intf:
+                if x != 'dummy':
+                    aval_intf.append(x)
+            aval_intf.extend(po_intf)
+            total_intf = len(set(aval_intf))
+            try:
+                assert used_intf <= total_intf, "-Are more defined Port-channels ({}) than free Port-channels in reserved range ({}) on {}".format(used_intf, total_intf, switch)
+            except AssertionError as e:
+                svc_intf_errors.append(str(e))
 
+        # Combines the SH and DH per device interface dictionaries
+        for d in (sh_per_dev_intf, dh_per_dev_intf):
+            for key, value in d.items():
+                per_dev_intf[key].extend(value)
 
-    # single_homed:
-    #   - descr: L3 > DC1-ASAv-XFW01 eth1
-    #     type: layer3
-    #     tenant: RED
-    #     ip_vlan: 10.255.99.1/30
-    #     switch: DC1-N9K-BORDER01
-    #     intf_num: 46
-    #   - descr: L3 > DC1-ASAv-XFW02 eth1
-    #     type: layer3
-    #     tenant: RED
-    #     ip_vlan: 10.255.99.5/30
-    #     switch: DC1-N9K-BORDER02
-    #   - descr: L3 > DC1-SRV-MON01 nic1
-    #     type: layer3
-    #     tenant: BLU
-    #     ip_vlan: 10.100.100.21/30
-    #     switch: DC1-N9K-LEAF01
-    #   - descr: ACCESS > DC1-SRV-APP01 eth1
-    #     type: access
-    #     ip_vlan: 10
-    #     switch: DC1-N9K-LEAF02
-    #   - descr: UPLINK > DC1-VIOS-SW3
-    #     type: stp_trunk
-    #     ip_vlan: 110,120
-    #     switch: DC1-N9K-LEAF01
-    #   - descr: UPLINK > DC1-VIOS-SW4
-    #     type: stp_trunk_non_ba
-    #     ip_vlan: 90
-    #     switch: DC1-N9K-LEAF01
-    #   - descr: ACCESS >DC1-LTM-LB02
-    #     type: non_stp_trunk
-    #     ip_vlan: 30
-    #     switch: DC1-N9K-LEAF02
+        # TOTAL_INTF: TOTAL_INTF: Make sure that are not more defined interfaces (single and dual_homed) than there are actual interfaces on the switch
+        for switch, intf in per_dev_intf.items():
+            if dev_name['leaf'] in switch:
+                max_intf = int(num_intf['leaf'].split(',')[1])
+            elif dev_name['border'] in switch:
+                max_intf = int(num_intf['border'].split(',')[1])
+            try:
+                assert len(intf) <= max_intf, "-Are more defined interfaces ({}) than the maximum number of interfaces ({}) on {}".format(len(intf), max_intf, switch)
+            except AssertionError as e:
+                svc_intf_errors.append(str(e))
 
-    # dual_homed:
-    #   - descr: ACCESS >DC1-SRV-APP01 eth1
-    #     type: access
-    #     ip_vlan: 10
-    #     switch: DC1-N9K-LEAF01
-    #   - descr: ACCESS >DC1-SRV-PRD01 eth1
-    #     type: access
-    #     ip_vlan: 20
-    #     switch: DC1-N9K-LEAF01
-    #     intf_num: 45
-    #     po_num: 14
-    #   - descr: UPLINK > DC1-VIOS-SW1
-    #     type: stp_trunk
-    #     ip_vlan: 110,120
-    #     switch: DC1-N9K-LEAF01
-    #   - descr: UPLINK > DC1-VIOS-SW2
-    #     type: stp_trunk_non_ba
-    #     ip_vlan: 90
-    #     switch: DC1-N9K-LEAF01
-    #     intf_num: 15
-    #   - descr: ACCESS >DC1-LTM-LB01
-    #     type: non_stp_trunk
-    #     ip_vlan: 30
-    #     switch: DC1-N9K-LEAF01
-    #     intf_num: 25
-    #   - descr: UPLINK > DC1-LTM-ESX1
-    #     type: non_stp_trunk
-    #     ip_vlan: 10,20,24,30,40
-    #     switch: DC1-N9K-LEAF01
-    #     po_num: 66
-    #   - descr: UPLINK > DC1-VIOS-DMZ01
-    #     type: stp_trunk_non_ba
-    #     ip_vlan: 110,120
-    #     switch: DC1-N9K-BORDER01
-
-
-# valid IP
-# Thta host is odd number host
-# that the int raneg adn po range the same number of avaiable interfaces (difference)
-# That the int range is not less than the number of interfaces
-# Are vlans or tenants alreadyt on a switch
-# What happens if dont ahve any config in services_interfaces?
-# Cant be a space between vlans in trunk ports as will casue it to fail
-# if no single or dual homed interfaces the header is hashed out
-# Layer 3 can never be dual homed
-# add check for base max_intf
+        return svc_intf_errors
