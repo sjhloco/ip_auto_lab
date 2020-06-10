@@ -1,12 +1,3 @@
-3. do pre-validation
-Create test var file for to be used for each pre-val type
-DRY each pre-val type by eliminating as amhy duplicates as possible.
-Start by doing for first pre-val section. Once thats done move onto next using methods created for first one.
-Add notes about what pre-val sectiosn methods are used for
-
-
-
-
 
 4. do post validation
 Change validation so seperate template per svc that are joined

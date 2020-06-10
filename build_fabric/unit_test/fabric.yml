@@ -1,0 +1,73 @@
+---
+################ Variables used to decide how the fabric will look ################
+
+# This Only scales to 4 spines, 10 leafs, 4 borders. By default the following ports are used:
+# SPINE-to-LEAF = Eth1/1 - 1/10           SPINE-to-Border = Eth1/11 - 1/15
+# LEAF-to-SPINE = Eth1/1 - 1/5            BORDER-to-SPINE: = Eth1/1 - 1/5
+# MLAG Peer-link = Eth1/127 - 128          MLAG keepalive = mgmt
+
+# How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in MLAG pair
+fbc:
+  network_size:
+    num_spines: 5                             # Can be 1 to 4
+    num_borders: 1                            # Can be 0, 2 or 4
+    num_leafs: "2"                              # Can be 2, 4, 6, 8 or 10
+
+# Number of interfaces on the device (first and last interface). Is needed to make interfaces declerative and default all interfaces not used
+  num_intf:
+    spine: 1,h
+    border: 44,128
+    leaf: 1,1289
+
+# To change Fabric routing protocol settings
+  route:
+    ospf:
+      pro:                          # Can be numbered or named
+      area: 0.0.0.267                           # Must be in dotted decimal format
+    bgp:
+      as_num:
+
+  acast_gw_mac: 000.2222:33z3                # Must be in the format xxxx.xxxx.xxxx
+
+################ Advanced settings to further customize the fabric ################
+
+  adv:
+    # Seed interfaces used to create the fabric. These are the first interfaces used, the inventory pluggin increments them
+    bse_intf:
+      intf_fmt: Ethernet1/                  # Switch interface naming format
+      intf_short: Eth1/                     # Used in descritions of interfaces
+      ec_fmt: Port-channel                  # LAG interface naming format
+      ec_short: Po                          # Used in descritions of LAG interfaces
+      sp_to_lf: 1                           # First interface used for SPINE to LEAF links (1 to 10)
+      sp_to_bdr: ee                         # First interface used for SPINE to BORDER links (11 to 14)
+      lf_to_sp: 1                           # First interface used LEAF to SPINE links (1 to 4)
+      bdr_to_sp:                          # First interface used BORDER to SPINE links (1 to 4)
+      mlag_peer: 11d12                      # Interfaces used for the MLAG peer Link (will be in the MLAG LAG)
+
+    # Loopback interfaces to be used, numbers and descriptions can be changed. As per best practise one per function.
+    lp:
+      rtr:
+        loopback1: LP > Routing protocol RID and peerings
+      vtep:
+        loopback2: LP > VTEP Tunnels (PIP) and MLAG (VIP)
+      bgw:
+        loopback1: LP > BGW anycast address             # Added now incase add multisite to the script
+
+    # All MLAG specific settings except for peer Link interfaces (bse.adv.base_intf.mlag_peer) and subnet (bse.addr.mlag_net)
+    mlag:
+      domain: 1                               # MLAG Domain number
+      peer_po: "2"                              # Port-channel used for Peer Link
+      peer_vlan: data                            # VLAN used for Peer Link and OSPF peering
+
+  # The increment that is added to the subnet and device hostname number to generate the unique last octet of the IP addresses
+    addr_incre:
+      spine_ip: 11                            # SPINE mgmt IP and routing loopback addresses will be from .11 to .14
+      border_ip: "16"                           # BORDER mgmt IP and routing loopback addresses will be from .16 to .19
+      leaf_ip:                              # LEAF mgmt IP and routing loopback addresses will be from .21 to .30
+      border_vtep_lp: 41                      # BORDER VTEP loopback addresses will be from .36 to .39
+      leaf_vtep_lp: 41                        # LEAF VTEP loopback addresses will be from .41 to .50
+      border_mlag_lp: five                      # Pair of BORDER MLAG shared loopback addresses (VIP) will be from .56 to .57
+      leaf_mlag_lp: 51                        # Pair of LEAF MLAG shared loopback addresses (VIP) will be from .51 to .55
+      border_bgw_lp: 51                       # Pair of BORDER BGW shared anycast loopback addresses will be from .58 to .59
+      mlag_leaf_ip: 0                         # Start IP for LEAF Peer Links, so LEAF1 is .0, LEAF2 .1, LEAF3 .2, etc
+      mlag_border_ip: 10                      # Start IP for BORDER Peer Links, so BORDER1 is .10, BORDER2 .11, etc

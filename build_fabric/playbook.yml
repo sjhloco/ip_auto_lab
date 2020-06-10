@@ -13,6 +13,11 @@
     - vars/fabric.yml             # All varaibles start with fbc.
     - vars/services_tenant.yml    # All varaibles start with svc_tnt
     - vars/services_interface.yml    # All varaibles start with svc_tnt
+    # Used to test pre_validation checls
+    # - unit_test/base.yml
+    # - unit_test/fabric.yml
+    # - unit_test/services_tenant.yml
+    # - unit_test/services_interface.yml
 
 ######################## 1. Validates the input data (in var_files) and creates the file strucuture ########################
   pre_tasks:
@@ -23,51 +28,34 @@
         assert:
           # Uses a filter pluggin input_validate to do the validating and returns the outcome to the Anisble assert module
           that: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }} == 'base.yml unittest pass'"
-          quiet: yes
           fail_msg: "{{ bse.device_name | input_bse_validate(bse.addr, bse.users) }}"
-      # Uses a filter pluggin  input_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of fabric.yml"
         assert:
           that: "{{ fbc.network_size | input_fbc_validate(fbc.num_intf, fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf, fbc.adv.lp,
                    fbc.adv.mlag, fbc.adv.addr_incre) }} == 'fabric.yml unittest pass'"
-          quiet: yes
           fail_msg: "{{ fbc.network_size | input_fbc_validate(fbc.num_intf, fbc.route, fbc.acast_gw_mac, fbc.adv.bse_intf,
                       fbc.adv.lp, fbc.adv.mlag, fbc.adv.addr_incre) }}"
-      # Uses a filter pluggin  input_svc_validate to do the validating and returns the outcome to the Anisble assert module
       - name: "SYS >> Validating the contents of services_tenant.yml"
         assert:
-          that: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }} == 'service_tenant.yml unittest pass'"
-          quiet: yes
+          that: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }} == 'services_tenant.yml unittest pass'"
           fail_msg: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }}"
+      - name: "SYS >> Validating the contents of services_interfaces.yml"
+        assert:
+          that: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name,
+                   fbc.num_intf) }} == 'services_interface.yml unittest pass'"
+          fail_msg: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
       run_once: true        # Doesnt need to run for every hosts as just validating files.
       tags: [pre_val, full]
 
 
-
-    # Uses a filter pluggin input_svc_validate to do the validating and returns the outcome to the Ansible assert module
-    - name: "Validate the contents of the variable files"
-      block:
-      - name: "SYS >> Validating the contents of services_interfaces.yml"
-        set_fact:
-          svc_intf_test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
-      - debug:
-          var=svc_intf_test
-    # - debug:
-    #     msg: "{{ ansible_play_hosts_all }}"
-      # with_inventory_hostnames:
-      #   - all
-      run_once: true
-      tags: test
-      # assert:
-      #   that: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv) }} == 'service_interface.yml unittest pass'"
-      #   quiet: yes
-      #   fail_msg: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv) }}"
-
-
-
-
-
-
+    # - name: "TO test a new varaible file"
+    #   block:
+    #   - set_fact:
+    #       test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
+    #   - debug:
+    #       var=test
+    #   run_once: true        # Doesnt need to run for every hosts as just validating files.
+    #   tags: [test]
 
     # 1b. Create the file structure
     - name: "Create the localhost environment"
