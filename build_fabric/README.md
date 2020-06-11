@@ -250,7 +250,7 @@ Under the advanced (*tnt.adv*) section of the variable file set the reserved ran
     - first_po: integrar
     - last_po: integrar
 
-From the values in the *services_interface.yml* file a new per-device (border and leaf) data model is created by the *format_dm.py* custom filter plugin. An example of the data model is shown below:
+From the values in the *services_interface.yml* file a new per-device data model is created by the *format_dm.py* custom filter plugin. An example of the data model is shown below:
 ```bash
 {
     "descr": "L3 > DC1-SRV-MON01 nic1",
