@@ -238,7 +238,8 @@ At a minimum the following settings need to be configured:
 To statically assign the interface and/or port-channel number (default is dynamic) add either of these 2 extra dictionaries to the interface. The values used can overlap with the dynamic interface range however for simplicty it is probably advisable to use a separate range for the dynamic and static assignments. 
   - intf_num: integrar          *Only specify the number, name is got from the fbc.adv.bse_intf.intf_fmt variable*
   - po_num: integrar           *Only specify the number, name is got from the fbc.adv.bse_intf.ec_fmt variable*
-  - po_num: string           *Optionally set the Port-channel mode to on, passive or active*
+  - po_mode: string           *Optionally set the Port-channel mode to on, passive or active*
+
 Under the advanced (*tnt.adv*) section of the variable file set the reserved range of interfaces to use for dynamic assignment:
 - adv:                            
   - single_homed:                      *Range used for single-homed interfaces*
