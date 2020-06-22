@@ -396,26 +396,26 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 
 ## Post Validation checks
 
-Builds a validation file from the configuration variables of the expected state (*desired state*) and compare that against the *actual state* of the device. *Napalm_validate* can only perform a compliance on anything that has a getter so for anything not covered by this the *custom_validate* pluggin is used. It uses the napalm_validate framework to create the same format of compliance report but the input is from a formated device output (can be got via any network module or napalm) rather than from napalm_validate.
+A validation file is built from the contents of the var files (*desired state*) and compared against the *actual state* of the device. *Napalm_validate* can only perform a compliance on anything that has a getter so for anything not covered by this the *custom_validate* plugin is used. The custom plugin uses the napalm_validate framework to create the same format of compliance report but uses an input file (generated from device output) rather than napalm_validate.
 
-Both validation engines are within the same role with seperate temaples and task files. The templates generate the desired state which is a combination of the commmands to run and the expected returned values. The desired state is store in */device_configs/device_name/validate*, with a separate file for napalm_validate and custom_validate.
+Both validation engines are within the same role with seperate template and task files. The templates generate the desired state which is a combination of the commmands to run and the expected returned values. As the same command can be used to validate multiple roles Jinja template inheritance (using *extend* and *block*) is used to keep the templating DRY yet not test roles that have not been provisioned.
 
-The results of these two tasks are joined together to create the one compliance report stored in */device_configs/reports*.
+The results of the naplam_validate (*nap_val.yml*) and custom_validate (*cus_val.yml*) tasks are joined together to create the one compliance report stored in */device_configs/reports*.
 
 ```bash
 cat ~/device_configs/reports/DC1-N9K-SPINE01_compliance_report.json | python -m json.tool
 ```
 
 ### napalm_validate
-By Napalms very nature it already abstracts the vendor so along as the vendor is supported and the getter exists the template files are the same for all vendors. The following elments are checked:
+Napalms very nature is to abstract the vendor so along as the vendor is supported and the getter exists the template files are the same for all vendors. The following elements are checked by naplam_validate post validation.
 - hostname: *Automatically created device names are correct*
 - bgp_neighbors: *Overlay neighbors are all up and at least one prefix received*
 - lldp_neighbors: *Device connections are correct*
 
-Note I did try ICMP but takes too long, the lines for this are hashed out
+Note: I did try ICMP but takes too long, the lines for this are hashed out
 
 ### custom_validate
-*custom_validate* requires a per-OS type template file and per-OS type method within the custom_validate filter_plugin. The command output can be ascertained via naplam or Ansible Network modules, ideally as JSON or you could use NTC templates or the genieparse collection to do this for you. Within *custom_validate.py* it matches based on the command and creates a new data model that matches the format of the desired state. Finally the *actual_state* and *desired_state* are fed into napalm_validate using its *compliance_report* method. The following elments are checked:
+*custom_validate* requires a per-OS type template file and per-OS type method within the *custom_validate.py* filter_plugin. The command output can be collected via Naplam or Ansible Network modules, ideally as JSON or you could use NTC templates or the genieparse collection to do this for you. Within *custom_validate.py* it matches based on the command and creates a new data model that matches the format of the desired state. Finally the *actual_state* and *desired_state* are fed into napalm_validate using its *compliance_report* method. The following elements are checked, the roles that in brackets)
 
 - show ip ospf neighbors detail: *Underlay neighbors are all up*
 - show port-channel summary: *Port-channel adn members up*
