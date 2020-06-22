@@ -213,7 +213,7 @@ An example of a data model created by the *format_dm.py* custom filter plugin. T
 ```
 
 ## Services - Interface Variables
-Interfaces are configured based on the variables specified in the *services_interfaces.yml* file. They can be singleor dual-homed with the interface and port-channel number either entered manually or dynamically chosen from a range. 
+Interfaces are configured based on the variables specified in the *services_interfaces.yml* file. They can be single or dual-homed with the interface and port-channel number either entered manually or dynamically chosen from a range. 
 
 By default all interfaces are *dual-homed* with an LACP state of 'active'. The interface details only need to be defined for the odd numbered switch, configuration for both members for the MLAG pair is automatically generated.\
 The VPC number can not be changed, it will always be the same as the port-channel number.\
@@ -284,13 +284,13 @@ From the values in the *services_interface.yml* file a new per-device data model
 ## Interface Cleanup - Defaulting Interfaces
 The interface cleanup role is required to make sure any interfaces not assigned by the fabric or the services (svc_intf) role have a default configuration. Without this if an interface was to be changed (for example a server moved to different interface) the old interface would not have its configuration put back to the default values.
 
-This role goes through the interfaces assigned by the fabric and services role producing a list of used interfaces which are then subtracted from the list of all the switches interfaces (*fbc.num_intf*). It has to be run after either of these roles as it needs to know what interfaces have been assigned, therefore uses tags to ensure it is run any time either of these roles are run.
+This role goes through the interfaces assigned by the fabric and services_interface role producing a list of used interfaces which are then subtracted from the list of all the switches interfaces (*fbc.num_intf*). It has to be run after either of these roles as it needs to know what interfaces have been assigned, therefore uses tags to ensure it is run any time either of these roles are run.
 
 ## Input validation
-Rather than validating any configuration on devices it validate the details entered in the variable files are correct .The idea of this pre-validation is to ensure the values in the variable files have are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection.\
+Rather than validating configuration on devices it runs before any device configuration and validate the details entered in the variable files are correct. The idea of this pre-validation is to ensure the values in the variable files are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection and configuration.\
 They are run as part of the playbook pre-tasks with the rules on what defines a pass or failure defined within the filter_plugin *input_validate.py*. The plugin does the actual validation with a result returned to the Anisble Asset module which decides if the playbook fails.
 
-To see a full list of what variables are checked and the expected input view the header notes of *input_validate.py*.
+A full list of what variables are checked and the expected input can be found in the header notes of *input_validate.py*.
 
 ## Playbook Structure
 
@@ -301,12 +301,14 @@ The playbook is divided into 3 sections with roles used to do all the templating
   - base: From templates and base.yml creates the base configuration snippets (aaa,  logging, mgmt, ntp, etc)
   - fabric: From templates and fabric.yml creates the fabric configuration snippets (connections, OSPF, BGP)
   - services: Has per-service type tasks and templates for the services to run on top of the fabric 
-    - svc_tnt: From templates and service_template.yml creates the tenant config snippets (VRF, SVI, VXLAN, VLAN)
+    - svc_tnt: From templates and services_tenant.yml creates the tenant config snippets (VRF, SVI, VXLAN, VLAN)
+    - svc_intf: From templates and services_interface.yml creates the interface config snippets (routed, access, trunk)
+-intf_cleanup: Based on interfaces used in fabric and svc_intf defaults all other interfaces      
 - task_config: Assembles the config snippets into the one file and applies as a config_replace
-- pre_tasks: A validate role creates and compares *desired_state* (built from variables) against *actual_state*    
+- post_tasks: A validate role creates and compares *desired_state* (built from variables) against *actual_state*    
   - validate: custom_validate uses naplam_validate feed with device output to validate things not covered by naplam
     - nap_val: For elements covered by naplam_getters creates desired_state and compares against actual_state 
-    - nap_val: For elements not covered by naplam_getters creates desired_state and compares against actual_state 
+    - cus_val: For elements not covered by naplam_getters creates desired_state and compares against actual_state 
     
 ## Directory Structure
 
@@ -374,7 +376,10 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--bse**                 Generates the base configuration snippet and saves it to file\
 **--fbc**                    Generates the fabric configuration snippet and saves it to file\
 **--bse_fbc**          Generates the base and fabric config snippets and joins them together\
-**--tnt**                  Generates the tenants config snippets and and saves it to file
+**--tnt**                  Generates the tenants config snippet and and saves it to file\
+**--intf**                  Generates the interface config snippet and and saves it to file\
+**--cln**                  Generates the tenants config snippets and and saves it to file
+
 
 **--cfg**                  Apply the configuration to devices (diffs are saved to file)\
 **--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
@@ -398,13 +403,15 @@ ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
 
 A validation file is built from the contents of the var files (*desired state*) and compared against the *actual state* of the device. *Napalm_validate* can only perform a compliance on anything that has a getter so for anything not covered by this the *custom_validate* plugin is used. The custom plugin uses the napalm_validate framework to create the same format of compliance report but uses an input file (generated from device output) rather than napalm_validate.
 
-Both validation engines are within the same role with seperate template and task files. The templates generate the desired state which is a combination of the commmands to run and the expected returned values. As the same command can be used to validate multiple roles Jinja template inheritance (using *extend* and *block*) is used to keep the templating DRY yet not test roles that have not been provisioned.
+Both validation engines are within the same role with seperate template and task files. The templates generate the desired state which is a combination of the commmands to run and the expected returned values. As the same command can be used to validate multiple roles Jinja template inheritance (using *extend* and *block*) is used to keep the templating DRY and not test roles that have not been provisioned yet.
 
 The results of the naplam_validate (*nap_val.yml*) and custom_validate (*cus_val.yml*) tasks are joined together to create the one compliance report stored in */device_configs/reports*.
 
 ```bash
 cat ~/device_configs/reports/DC1-N9K-SPINE01_compliance_report.json | python -m json.tool
 ```
+
+By default the post-check assert play has *quiet_mode* enabled as it can be very noisy even for a successfuly validation. If anything fails it is easier to go through the report rather than Ansible output to find out exactly what failed.
 
 ### napalm_validate
 Napalms very nature is to abstract the vendor so along as the vendor is supported and the getter exists the template files are the same for all vendors. The following elements are checked by naplam_validate post validation.
@@ -415,14 +422,16 @@ Napalms very nature is to abstract the vendor so along as the vendor is supporte
 Note: I did try ICMP but takes too long, the lines for this are hashed out
 
 ### custom_validate
-*custom_validate* requires a per-OS type template file and per-OS type method within the *custom_validate.py* filter_plugin. The command output can be collected via Naplam or Ansible Network modules, ideally as JSON or you could use NTC templates or the genieparse collection to do this for you. Within *custom_validate.py* it matches based on the command and creates a new data model that matches the format of the desired state. Finally the *actual_state* and *desired_state* are fed into napalm_validate using its *compliance_report* method. The following elements are checked, the roles that in brackets)
+*custom_validate* requires a per-OS type template file and per-OS type method within the *custom_validate.py* filter_plugin. The command output can be collected via Naplam or Ansible Network modules, ideally as JSON or you could use NTC templates or the genieparse collection to do this. Within *custom_validate.py* it matches based on the command and creates a new data model that matches the format of the desired state. Finally the *actual_state* and *desired_state* are fed into napalm_validate using its *compliance_report* method. The following elements are checked, the roles that use these checks are in brackets
 
-- show ip ospf neighbors detail: *Underlay neighbors are all up*
-- show port-channel summary: *Port-channel adn members up*
-- show vpc: *MLAG peer link and keepl-alive up*
-- show ip int brief include-secondary vrf all: *All L3 interfaces in fabric and tenants up with correct IPs*
-- show nve peers: *All VTEP tunnels are up*
-- show nve vni: *All VNIs are up, have correct VNI number and VLAN mapping*
+- show ip ospf neighbors detail (fbc): *Underlay neighbors are all up*
+- show port-channel summary (fbc, intf): *Port-channel state and members (strict) are up*
+- show vpc (fbc, tnt, intf): *MLAG peer-link, keep-alive state, vpc status and active VLANs*
+- show interfaces trunk	(fbc, tnt, intf): *Allowed vlans and stp forwarding vlans*
+- show ip int brief include-secondary vrf all (fbc, tnt, intf): *L3 interfaces in fabric and tenants*
+- show nve peers (tnt): *All VTEP tunnels are up*
+- show nve vni (tnt): *All VNIs are up, have correct VNI number and VLAN mapping*
+- show interface status	(intf): *State and port type*
 
 To aid with creating new validations the custom_val_builder is a stripped down version of custom_validate to use to build new validations. The README has the process but can basically feed in either feed in static dictionary file or device output to aid in the creation of the method code and template snippet before testing and then movign to the main playbook.
 
@@ -442,11 +451,13 @@ Process for building a new service:
 Have disabled ping from the napalm validation as took too long, loopbacks with secondary IP address can take 3 mins to come up. If fabric wasnt up BGP and OSPF wouldnt be up, can check other loopbacks as part of services.
 Not sure about rollback, all though says all worked odd switch didnt rollback (full config, not sure if would be same with smaller bits of config).
 
-1. Need to make it so post-validation doesnt run tnt checks if only running base and fabric. SO a different template used for napalm_validate (as  fail since needs 1 prefix) and custom_validate. Can either use wehn statements or tags
-2. Add remaining services
-
+1. Add routing  services
 
 Nice to have
 1. Create a seperate playbook to update Netbox with information used to build the fabric
 1. Add multi-site
 2. Add templates for Arista
+
+## Caveats
+NXOS API can sometimes stop working if reboot a device or push config. Not sure if is just happens on virtual devices. In the CLI it will say it is runnign and listening but you cant connect on port 443 to the device. To fix disable and renable the feature nxapi
+-Note about how when reboot a device NXAPI stops working (even though it shows as listneing). Disable/ renable the feature
