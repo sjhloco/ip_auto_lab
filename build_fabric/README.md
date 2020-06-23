@@ -383,6 +383,8 @@ ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in */device_configs/diff*) and optionally printed to screen.\
 Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is used for dry-runs.
 
+NEED TO REWORD THIS INTO COMMON AND NOT SO COMMON as too complictaed
+
 **--pre_val**             Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
 **--dir**                    Deletes and recreates the file struture to save configs, diffs and reports
 
@@ -400,9 +402,11 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--rb**                    Reverses the changes by applying the rollback configuration\
 **--rb_diff**               Reverses the changes by applying the rollback configuration and prints the diffs to screen
 
-**--val_temp**        Generates desired state validation files for *napalm_validate* and *custom_validate*\
-**--nap_val**           Generates validation file for all roles and runs generic *napalm_validate* to check LLDP, BGP and ping\
-**--cus_val**           Generates validation file for all roles and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
+**--nap_val**           Run napalm-validation with whatever validatiion files have been created via other tags
+**--cus_val**           Run custom-validation with whatever validatiion files have been created via other tags
+
+**--nap_val_all**           Generates validation file for all roles and runs generic *napalm_validate* to check LLDP, BGP and ping\
+**--cus_val_all**           Generates validation file for all roles and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
 **--post_val**         Runs nap_val and cus_val
 
 **--full**                  Runs everything except cfg_diff
