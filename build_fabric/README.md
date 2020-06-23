@@ -116,6 +116,19 @@ These core elements are the minimum requirements to create the declarative fabri
 - mlag_leaf_ip: 0                 *Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc*
 - mlag_border_ip: 10            *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
 
+| variable       | Value | Description                                                                   |
+|----------------|-------|-------------------------------------------------------------------------------|
+| spine_ip       | 11    | Spine mgmt IP and routing loopback addresses will be from .11 to .14          |
+| border_ip      | 16    | Border mgmt IP and routing loopback addresses will be from .16 to .19         |
+| leaf_ip        | 21    | Leaf mgmt IP and routing loopback addresses will be from .21 to .30           |
+| border_vtep_lp | 36    | Border VTEP loopback addresses will be from .36 to .39                        |
+| leaf_vtep_lp   | 41    | Leaf VTEP loopback addresses will be from .41 to .50                          |
+| border_mlag_lp | 56    | Pair of border shared loopback addresses (VIP) will be from .56 to .57        |
+| leaf_mlag_lp   | 51    | Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55     |
+| border_bgw_lp  | 58    | Pair of border  BGW shared anycast loopback addresses will be from .58 to .59 |
+| mlag_leaf_ip   | 0     | Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc   |
+| mlag_border_ip | 10    | Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc       |
+
 ## Services - Tenant Variables
 
 Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the *services_tenant.yml* file. At a minimun the following values need to be defined per-tenant.
@@ -373,22 +386,23 @@ Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is us
 **--pre_val**             Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
 **--dir**                    Deletes and recreates the file struture to save configs, diffs and reports
 
-**--bse**                 Generates the base configuration snippet and saves it to file\
-**--fbc**                    Generates the fabric configuration snippet and saves it to file\
-**--bse_fbc**          Generates the base and fabric config snippets and joins them together\
-**--tnt**                  Generates the tenants config snippet and and saves it to file\
-**--intf**                  Generates the interface config snippet and and saves it to file\
-**--cln**                  Generates the tenants config snippets and and saves it to file
+**--bse**                 Generates the base configuration snippet\
+**--fbc**                    Generates the fabric config snippet and validation file\
+**--tnt**                  Generates the tenants config snippet and validation file\
+**--intf**                  Generates the interface config snippet and validation file\
+**--cln**                  Generates config snippet to reset none used interfaces
 
+**--bse_fbc**          Generates and joins base, fabric and inft cleanup config snippets and creates validation file\
+**--bse_fbc_svc**     Generates and joins base, fabric, all services and inft cleanup config snippets and creates validation file
 
 **--cfg**                  Apply the configuration to devices (diffs are saved to file)\
 **--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
 **--rb**                    Reverses the changes by applying the rollback configuration\
-**--rb_diff**                    Reverses the changes by applying the rollback configuration and prints the diffs to screen
+**--rb_diff**               Reverses the changes by applying the rollback configuration and prints the diffs to screen
 
 **--val_temp**        Generates desired state validation files for *napalm_validate* and *custom_validate*\
-**--nap_val**           Generates validation file and runs generic *napalm_validate* to check LLDP, BGP and ping\
-**--cus_val**           Generates validation file and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
+**--nap_val**           Generates validation file for all roles and runs generic *napalm_validate* to check LLDP, BGP and ping\
+**--cus_val**           Generates validation file for all roles and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
 **--post_val**         Runs nap_val and cus_val
 
 **--full**                  Runs everything except cfg_diff
