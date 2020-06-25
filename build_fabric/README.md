@@ -364,7 +364,6 @@ interface mgmt0
 vrf context management
   ip route 0.0.0.0/0 10.10.108.1
 feature nxapi
-nxapi use-vrf management
 feature scp-server
 boot nxos bootflash:/nxos.9.2.4.bin
 hardware access-list tcam region racl 512
@@ -383,39 +382,45 @@ ansible-playbook ssh_keys/ssh_key_add.yml -i ssh_keys/ssh_hosts
 The playbook can be run with any number of the following tags. The device configuration is applied using NAPLAM with the change differences always saved to file (in */device_configs/diff*) and optionally printed to screen.\
 Naplalm *commit_changes* is set to true meaning that Anisible *check-mode* is used for dry-runs.
 
-NEED TO REWORD THIS INTO COMMON AND NOT SO COMMON as too complictaed
+As the playbook has got bigger I found it confusing when run in one go so maybe easier if done so in stages:
 
-**--pre_val**             Checks var_file contents are valid and conform to script rules (network_size, address format, etc)\
-**--dir**                    Deletes and recreates the file struture to save configs, diffs and reports
+1. Pre-checks: Ensure that all the values in the variable conform to the playbook rules and standards. No point running the playbook if the variables are going to make it fail.
+    - `ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag pre_val`
+2. Generate the configuration: Creates the config snippets and compares against what is on the device to see what will be change. *bse_fbc_svc* does the whole configuration but use any combination of the snippets (*bse*, *fbc*, *bse_fbc*, *tnt*, *intf*, *svc*)
+    - `ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir, bse_fbc_svc, cfg_diff" -C`
+ 
+3. Apply the configuration: Replaces current config on the device. The output is by default automatically saved to file (*/device_configs/diff*) so no real need to print to screen again.
+    - `ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag cfg`
 
-**--bse**                 Generates the base configuration snippet\
-**--fbc**                    Generates the fabric config snippet and validation file\
-**--tnt**                  Generates the tenants config snippet and validation file\
-**--intf**                  Generates the interface config snippet and validation file\
-**--cln**                  Generates config snippet to reset none used interfaces
-
-**--bse_fbc**          Generates and joins base, fabric and inft cleanup config snippets and creates validation file\
-**--bse_fbc_svc**     Generates and joins base, fabric, all services and inft cleanup config snippets and creates validation file
-
-**--cfg**                  Apply the configuration to devices (diffs are saved to file)\
-**--cfg_diff**          Apply the config and print the differences to screen (also still saved to file)\
-**--rb**                    Reverses the changes by applying the rollback configuration\
-**--rb_diff**               Reverses the changes by applying the rollback configuration and prints the diffs to screen
-
-**--nap_val**           Run napalm-validation with whatever validatiion files have been created via other tags
-**--cus_val**           Run custom-validation with whatever validatiion files have been created via other tags
-
-**--nap_val_all**           Generates validation file for all roles and runs generic *napalm_validate* to check LLDP, BGP and ping\
-**--cus_val_all**           Generates validation file for all roles and runs device type specific *custom_validate* to check OSPF, LAG and MLAG\
-**--post_val**         Runs nap_val and cus_val
-
-**--full**                  Runs everything except cfg_diff
-
-If the playbook is run in check-mode the post_validation tasks will not be run.
-```bash
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full, cfg_diff" -C
-ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "full"
-```
+4. Post-checks: Uses napalm-validate and custom-validate to ensure that the actual-state (from device) matches the expected state (got from variables files)
+    - `ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag post_val`
+ 
+| tag             | Description                                                                                         |
+|-----------------|-----------------------------------------------------------------------------------------------------|
+| pre_val         | Checks var_file contents are valid and conform to script rules (network_size, address format, etc)  |
+| dir             | Deletes and re-creates the file struture to save configs, diffs and reports                         |
+| bse             | Generates the base configuration snippet                                                            |
+| fbc             | Generates the fabric configuration snippet                                                          |
+| tnt             | Generates the fabric configuration snippet                                                          |
+| intf            | Generates the interface config snippet                                                              |
+| cln             | Generates the configuration snippet to reset all the none used interfaces to the defaults           |
+| bse_fbc         | Generates and joins the base, fabric and inft cleanup configuration snippet                         |
+| bse_fbc_svc     | Generates and joins the base, fabric, all services and inft cleanup configuration snippet           |
+| cfg             | Applies the configuration to the devices (diffs are saved to file)                                  |
+| cfg_diff        | Applies the configuration and prints the differences to screen (is still also saved to file)        |
+| rb              | Reverses the changes by applying the rollback configuration                                         |
+| rb_diff         | Reverses the changes by applying the rollback configuration and prints the diffs to screen          |
+| nap_val_fbc_bse | Runs napalm-validation against the *desired state* from the base and fabric variable files          |
+| nap_val_tnt     | Runs napalm-validation against the *desired state* from the services_tenant variable file           |
+| nap_val_svc     | Runs napalm-validation against the *desired state* from all the services variable files             |  
+| nap_val         | Runs napalm-validation against the *desired state* from all variable files                          | 
+| cus_val_fbc_bse | Runs custom-validation against the *desired state* from the base and fabric variable files          |
+| cus_val_tnt     | Runs custom-validation against the *desired state* from the services_tenant variable file           |
+| cus_val_intf    | Runs custom-validation against the *desired state* from the services_interface variable file        |
+| cus_val_svc     | Runs custom-validation against the *desired state* from all the services variable files             |  
+| cus_val         | Runs custom-validation against the *desired state* from all variable files                          | 
+| post_val        | Runs napalm and custom-validation against the *desired state* from all variable files               | 
+| full            | Runs pre_val, bse_fbc_svc, cfg and post_val                                                         | 
 
 ## Post Validation checks
 
