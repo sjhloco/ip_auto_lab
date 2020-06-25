@@ -1,8 +1,8 @@
 ---
 - name: "Create a Custom Validation"
   # hosts: all
-  # hosts: DC1-N9K-LEAF02
-  hosts: DC1-N9K-BORDER01
+  hosts: DC1-N9K-LEAF01
+  # hosts: DC1-N9K-BORDER01
   # hosts: DC1-N9K-SPINE01
   connection: local
   vars_files:
@@ -11,20 +11,24 @@
     - vars/my_vars.yml
     - vars/ansible.yml
     - vars/services_tenant.yml
+    - vars/services_interface.yml
+
 
   tasks:
     # TEMPLATE: Creates validation file of expected desired state from the input data
     - name: "SYS >> Creating the validation files"
       block:
       - set_fact:
-          flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre) }}"   # Completes data-model with VNI
+          flt_svc_intf: "{{ svc_intf.intf |create_svc_intf_dm(inventory_hostname, svc_intf.adv, fbc.adv.bse_intf) }}"
         check_mode: False             # These tasks still make changes when in check mode
         run_once: true                # Only has to run once to create the new data-models
       - template:
           src: "val_tmpl.j2"
           dest: "files/desired_state.yml"
         changed_when: False
-      tags: [tmpl, dev_val, file_val]
+      tags: [tmpl, dev_val, file_val, flt]
+    # - debug: var=flt_svc_intf
+    #   tags: [tmpl, dev_val, file_val, flt]
 
     # DEVICE_OUTPUT: napalm_cli gets the actual state and feeds it into custom_validate
     - name: "Create compliance report from dynamic device output"

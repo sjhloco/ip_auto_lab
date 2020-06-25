@@ -4,15 +4,15 @@
 - name: "Deploy Leaf and Spine DC"
   hosts: all
   # hosts: DC1-N9K-BORDER02
-  # hosts: DC1-N9K-LEAF01
+  # hosts: DC1-N9K-LEAF01:DC1-N9K-LEAF02
   # hosts: DC1-N9K-SPINE02
   connection: local
   vars_files:
-    - vars/ansible.yml            # All varaibles start with ans.
-    - vars/base.yml               # All varaibles start with bse.
-    - vars/fabric.yml             # All varaibles start with fbc.
-    - vars/services_tenant.yml    # All varaibles start with svc_tnt
-    - vars/services_interface.yml    # All varaibles start with svc_tnt
+    - vars/ansible.yml            # All variables start with ans.
+    - vars/base.yml               # All variables start with bse.
+    - vars/fabric.yml             # All variables start with fbc.
+    - vars/services_tenant.yml    # All variables start with svc_tnt
+    - vars/services_interface.yml    # All variables start with svc_tnt
     # Used to test pre_validation checls
     # - unit_test/base.yml
     # - unit_test/fabric.yml
@@ -41,20 +41,19 @@
           fail_msg: "{{ svc_tnt.tnt | input_svc_tnt_validate(svc_tnt.adv) }}"
       - name: "SYS >> Validating the contents of services_interfaces.yml"
         assert:
-          that: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name,
+          that: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, fbc.network_size, svc_tnt.tnt, bse.device_name,
                    fbc.num_intf) }} == 'services_interface.yml unittest pass'"
-          fail_msg: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
+          fail_msg: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, fbc.network_size, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
       run_once: true        # Doesnt need to run for every hosts as just validating files.
       tags: [pre_val, full]
 
-
-    # - name: "TO test a new varaible file"
+    # - name: "TO test a new variable file"
     #   block:
     #   - set_fact:
-    #       test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, ansible_play_hosts_all, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
+    #         test: "{{ svc_intf.intf | input_svc_intf_validate(svc_intf.adv, fbc.network_size, svc_tnt.tnt, bse.device_name, fbc.num_intf) }}"
     #   - debug:
     #       var=test
-    #   run_once: true        # Doesnt need to run for every hosts as just validating files.
+    #   run_once: true
     #   tags: [test]
 
     # 1b. Create the file structure
@@ -65,7 +64,6 @@
           path: "{{ ans.dir_path }}"
           state: absent
         run_once: true        # Only needs to run for one host as delets the root directory
-        # ignore_errors: yes  # Needed as for some reason errors trying to remove directories even though were removed
         changed_when: False
       - name: "SYS >> Creating file structure"
         file: path="{{ ans.dir_path }}/{{ item }}" state=directory
@@ -76,9 +74,6 @@
       tags: [dir, full]
 
 ######################## 2. Create the config snippets from templates ########################
-  # roles:
-  #   - base
-  #   - fabric
   tasks:
     - name: Builds the base config snippet
       import_role:
@@ -93,8 +88,7 @@
         name: services
         tasks_from: svc_tnt
       tags: [tnt, svc, bse_fbc_svc, full]
-
-    - name: Builds the tenant config snippets
+    - name: Builds the interface config snippets
       import_role:
         name: services
         tasks_from: svc_intf
@@ -115,7 +109,7 @@
         regexp: '\.conf$'           # Ensures only joins the files created by the roles
       changed_when: False           # Stops it reporting changes in playbook summary
       check_mode: False             # These tasks still make changes when in check mode
-      tags: [bse_fbc, bse_fbc_svc, full]
+      tags: [asmb, bse_fbc, bse_fbc_svc, full]
 
   # 3b. Replace the configuration on the devices with the config in the assembled config file
     - name: "NET >> Applying changes using replace config"
@@ -169,15 +163,12 @@
       import_role:
         name: validate
         tasks_from: nap_val
-      tags: [nap_val, post_val, full]
+      # tags: [nap_val, post_val, full]
 
     - name: Import custom_validate tasks to compare actual vs desired state
       block:
-      # Passes svc_tnt through filter to get per device-role DMs
-      - set_fact:
-          flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre) }}"
       - name: Import custom_validate tasks to compare actual vs desired state
         import_role:
           name: validate
           tasks_from: cus_val
-      tags: [cus_val, post_val, full]
+      # tags are within the role

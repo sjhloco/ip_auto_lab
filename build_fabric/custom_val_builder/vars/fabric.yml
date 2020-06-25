@@ -13,6 +13,12 @@ fbc:
     num_borders: 2                            # Can be 0, 2 or 4
     num_leafs: 2                              # Can be 2, 4, 6, 8 or 10
 
+# Number of interfaces on the device (first and last interface). Is needed to make interfaces declerative and default all interfaces not used
+  num_intf:
+    spine: 1,128
+    border: 1,128
+    leaf: 1,128
+
 # To change Fabric routing protocol settings
   route:
     ospf:
@@ -30,13 +36,13 @@ fbc:
     bse_intf:
       intf_fmt: Ethernet1/                  # Switch interface naming format
       intf_short: Eth1/                     # Used in descritions of interfaces
-      ec_fmt: Port-channel                  # LAG interface naming format
+      ec_fmt: port-channel                  # LAG interface naming format
       ec_short: Po                          # Used in descritions of LAG interfaces
       sp_to_lf: 1                           # First interface used for SPINE to LEAF links (1 to 10)
-      sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 44)
+      sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 14)
       lf_to_sp: 1                           # First interface used LEAF to SPINE links (1 to 4)
       bdr_to_sp: 1                          # First interface used BORDER to SPINE links (1 to 4)
-      mlag_peer: 14-15                      # Interfaces used for the MLAG peer Link (will be in the MLAG LAG)
+      mlag_peer: 11-12                      # Interfaces used for the MLAG peer Link (will be in the MLAG LAG)
 
     # Loopback interfaces to be used, numbers and descriptions can be changed. As per best practise one per function.
     lp:

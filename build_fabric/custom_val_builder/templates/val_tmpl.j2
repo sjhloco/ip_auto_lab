@@ -1,58 +1,15 @@
-{#### Logic to decide which set of variables in flt_svc_tnt to render dependant on device-role ####}
-{% if bse.device_name.leaf in inventory_hostname %}{% set flt_vars = flt_svc_tnt[0] %}
-{% elif bse.device_name.border in inventory_hostname %}{% set flt_vars = flt_svc_tnt[1] %}
-{% endif %}
-
 cmds:
-  - show ip int brief include-secondary vrf all:
-      management:
-        mgmt0:
-          prefix: {{ ansible_host }}
-          proto-state: up
-          link-state: up
-          admin-state: up
-      default:
-{# Creates template for all loopbacks (including secondary mlag ip) and interfces in default VRF #}
-{%for intf in intf_lp + intf_fbc.keys() | list %}{% if intf.ip is defined %}
-        {{ intf.name | replace('loopback','Lo') }}:
-{# Strict mode so only the L3 mgmt, loopbacks, L&S uplinks and MLAGs can exist #}
-          _mode: strict
-{% if intf.mlag_lp_addr is defined %}
-          prefix: {{ intf.ip |ipaddr('address'), intf.mlag_lp_addr |ipaddr('address') }}
-{% else %}
-          prefix: {{ intf.ip |ipaddr('address') }}
-{% endif %}{% else %}
-        {{ intf | replace('Ethernet','Eth') }}:
-          prefix: None
-{% endif %}
-          proto-state: up
-          link-state: up
-          admin-state: up
-{% endfor %}
-
-{# The rest of the actions are only performed on the leaf and border switches #}
-{% if bse.device_name.spine not in inventory_hostname %}
-        Vlan{{ fbc.adv.mlag.peer_vlan }}:
-          prefix: {{ mlag_peer_ip |ipaddr('address') }}
-          proto-state: up
-          link-state: up
-          admin-state: up
-
-
-{##### Validates interfaces in tenant VRFs created from services_tenant.yml #####}
-{% for flt_tnt in flt_vars %}{% if flt_tnt.l3_tnt is sameas true %}
-      {{ flt_tnt.tnt_name }}:
-{# Strict mode so only the L3 SVIs (L3VNI has no iP) in the service_tenants can exist #}
-        _mode: strict
-{% for vl in flt_tnt.vlans %}
-{% if vl.ip_addr == 'l3_vni' or vl.ip_addr |ipaddr('address') != False %}
-        Vlan{{ vl.num }}:
-{% if vl.ip_addr != 'l3_vni' %}
-          prefix: {{ vl.ip_addr |ipaddr('address') }}
-{% endif %}
-          proto-state: up
-          link-state: up
-          admin-state: up
-{% endif %}{% endfor %}{% endif %}{% endfor %}
-{% endif %}
-
+  - show vpc:
+      peer-link_po: {{ fbc.adv.bse_intf.ec_short + fbc.adv.mlag.peer_po |string }}
+      peer-link_vlans: "1-2,10,20,24,30,40,110,120,210,220,3001-3002"
+      vpc_peer_keepalive_status: peer-alive
+      vpc_peer_status: peer-ok
+{% for intf in flt_svc_intf %}
+{% if intf.vpc_num is defined %}
+{# Changes long name (port-channel) to short name (Po) #}
+      {{ intf.intf_num | replace(fbc.adv.bse_intf.ec_fmt,fbc.adv.bse_intf.ec_short) }}:
+        consistency_status: SUCCESS
+        port_status: "1"
+        vpc_num: "{{ intf.vpc_num }}"
+        active_vlans: {{ intf.ip_vlan }}
+{% endif %}{% endfor %}

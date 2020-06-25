@@ -1,0 +1,13 @@
+{##### From the input variables generates a validation file (expected state) used by napalm_validate to validate actual state #####}
+{####### Validates the tenant information, so the configuration as applied from services_interface.yml by the svc_intf role ######}
+
+{# Adds the results of this rendered file into the bse_fbc_val_tmpl file #}
+{% extends "napalm/bse_fbc_val_tmpl.j2" %}
+
+
+{### get_bgp_neighbors ###}
+{% block get_bgp_neighbors %}
+          address_family:
+            l2vpn:
+              received_prefixes: '>=1'
+{% endblock %}

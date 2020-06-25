@@ -9,9 +9,9 @@
 # How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in MLAG pair
 fbc:
   network_size:
-    num_spines: 2                             # Can be 1 to 4
-    num_borders: 2                            # Can be 0, 2 or 4
-    num_leafs: 2                              # Can be 2, 4, 6, 8 or 10
+    num_spine: 2                             # Can be 1 to 4
+    num_border: 2                            # Can be 0, 2 or 4
+    num_leaf: 2                              # Can be 2, 4, 6, 8 or 10
 
 # Number of interfaces on the device (first and last interface). Is needed to make interfaces declerative and default all interfaces not used
   num_intf:
@@ -36,7 +36,7 @@ fbc:
     bse_intf:
       intf_fmt: Ethernet1/                  # Switch interface naming format
       intf_short: Eth1/                     # Used in descritions of interfaces
-      ec_fmt: Port-channel                  # LAG interface naming format
+      ec_fmt: port-channel                  # LAG interface naming format
       ec_short: Po                          # Used in descritions of LAG interfaces
       sp_to_lf: 1                           # First interface used for SPINE to LEAF links (1 to 10)
       sp_to_bdr: 11                         # First interface used for SPINE to BORDER links (11 to 14)

@@ -1,1 +1,1 @@
-{"show ip int brief include-secondary vrf all": {"complies": false, "present": {"management": {"complies": true, "nested": true}, "default": {"complies": true, "nested": true}}, "missing": ["GRN"], "extra": []}, "skipped": [], "complies": false}
+{"show vpc": {"complies": false, "present": {}, "missing": ["peer-link_po", "peer-link_vlans", "vpc_peer_keepalive_status", "vpc_peer_status", "Po44", "Po13", "Po14"], "extra": []}, "skipped": [], "complies": false}

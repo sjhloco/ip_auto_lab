@@ -88,9 +88,9 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
         self.spine, self.border, self.leaf = ([] for i in range(3))
 
         # Create new network size variabels as will be decreasing the value
-        num_sp = self.network_size['num_spines']
-        num_lf = self.network_size['num_leafs']
-        num_bdr = self.network_size['num_borders']
+        num_sp = self.network_size['num_spine']
+        num_lf = self.network_size['num_leaf']
+        num_bdr = self.network_size['num_border']
 
         # 3a. SPINE: Generates name, management and Loopback IP (rtr) and adds to self.all_x dictionaries (spine_name is the key)
         incr_num = 0
@@ -154,28 +154,28 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
 
         # 4a. SPINE: Create nested dictionary of the devices fabric interfaces based on number of leaf and border switches
         for sp in self.spine:
-            for lf_num in range(self.network_size['num_leafs']):
+            for lf_num in range(self.network_size['num_leaf']):
                 # Loops through the number of leafs using the increment to create the remote device name
                 dev_name = 'UPLINK > ' + self.device_name['leaf'] + "{:02d} ".format(lf_num +1)
                 # Creates remote device port using spine number and the leaf_to_spine interfcae increment
                 dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['lf_to_sp'] -1)
                 # Interface number got from the starting interface increment (sp_to_lf) and the loop interation (lf_num)
                 self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_lf'] + lf_num))] = dev_name + dev_int
-            for bdr_num in range(self.network_size['num_borders']):
+            for bdr_num in range(self.network_size['num_border']):
                 dev_name = 'UPLINK > ' + self.device_name['border'] + "{:02d} ".format(bdr_num +1)
                 dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(sp[-2:]) + self.bse_intf['bdr_to_sp'] -1)
                 self.all_int[sp][self.bse_intf['intf_fmt'] + (str(self.bse_intf['sp_to_bdr'] + bdr_num))] = dev_name + dev_int
 
         # 4b. LEAF: Create nested dictionary of the devices fabric interfaces based on the number of spine switches
         for lf in self.leaf:
-            for sp_num in range(self.network_size['num_spines']):
+            for sp_num in range(self.network_size['num_spine']):
                 dev_name = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1)
                 dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(lf[-2:]) + self.bse_intf['sp_to_lf'] -1)
                 self.all_int[lf][self.bse_intf['intf_fmt'] + (str(self.bse_intf['lf_to_sp'] + sp_num))] = dev_name + dev_int
 
         # 4c. BORDER: Create nested dictionary of the devices fabric interfaces based on the number of spine switches
         for bdr in self.border:
-            for sp_num in range(self.network_size['num_spines']):
+            for sp_num in range(self.network_size['num_spine']):
                 dev_name = 'UPLINK > ' + self.device_name['spine'] + "{:02d} ".format(sp_num +1)
                 dev_int = self.bse_intf['intf_short'] + "{:01d}".format(int(bdr[-2:]) + self.bse_intf['sp_to_bdr'] -1)
                 self.all_int[bdr][self.bse_intf['intf_fmt'] + (str(self.bse_intf['bdr_to_sp'] + sp_num))] = dev_name + dev_int

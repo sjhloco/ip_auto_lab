@@ -37,8 +37,11 @@ interface {{ intf.intf_num }}
   vpc {{ intf.vpc_num }}
 {# All Layer2 dual-homed ports #}
 {% endif %}{% endif %}{% if intf.dual_homed is sameas true %}
+{% if intf.po_mode == 'on' %}
+  channel-group {{ intf.po_num }} force
+{% else %}
   channel-group {{ intf.po_num }} force mode {{ intf.po_mode }}
-{% endif %}{% endif %}
+{% endif %}{% endif %}{% endif %}
   no shutdown
 
 {% endfor %}

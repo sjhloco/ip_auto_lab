@@ -1,8 +1,18 @@
-{##### From the input variables generates a validation file (expected state) used by napalm_validate to validate actual state #####}
+{##### From the input variables generates a validation file (expected state) used by napalm_validate  to validate actual state #####}
+{####### Validates the fabric, so the configuration as applied from fabric.yml by fabric role ######}
+{########## Block statements inherit cmd validation info from the svc_tnt_val_tmpl.j2 template  #########}
+
+{# Macro used as need to use the same block more than once #}
+{%- macro macro_get_bgp_neighbors() -%}
+{% block get_bgp_neighbors %}{% endblock %}
+{%- endmacro -%}
+
+
+{### get_facts ###}
 - get_facts:
     hostname: {{ inventory_hostname }}
 
-{##### Gets a list of LDDP neighbors by using the devices interface description from host_vars ######}
+{### get_lldp_neighbors ###}
 - get_lldp_neighbors:
 {% for intf, descr in intf_fbc.items() %}
 {# {% for intf, descr in hostvars['DC1-N9K-BORDER02'].intf_fbc.items() %} #}  {#For testing in python #}
@@ -11,7 +21,7 @@
         port: {{ fbc.adv.bse_intf.intf_fmt + (descr.split(' ')[3] | replace(fbc.adv.bse_intf.intf_short, '')) }}
 {% endfor %}
 
-{##### Gets BGP neighbors by getting all devices rtr loopback from host_vars ######}
+{### get_bgp_neighbors ###}
 - get_bgp_neighbors:
     global:
       router_id: {{ intf_lp[0].ip |ipaddr('address')  }}
@@ -22,19 +32,16 @@
         {{ hostvars[x].intf_lp[0].ip |ipaddr('address') }}:
           is_enabled: true
           is_up: true
-
+{{ macro_get_bgp_neighbors() }}
 {% endfor %} {% else %}
 {% for x in groups[bse.device_name.spine.split('-')[-1].lower()] %}
         {{ hostvars[x].intf_lp[0].ip |ipaddr('address') }}:
           is_enabled: true
           is_up: true
-          address_family:
-            l2vpn:
-              received_prefixes: '>=1'
-
+{{ macro_get_bgp_neighbors() }}
 {% endfor %} {% endif %}
 
-{##### Gets all loopback addresses from host_vars. Disabled as takes too long #####}
+{### ping: Gets all loopback addresses from host_vars. Disabled as takes too long ###}
 {# {% for x in groups['all'] %}
 - ping:
     _name: ping RTR loopback {{ x }}

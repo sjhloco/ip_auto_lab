@@ -7,7 +7,6 @@ bse:
     spine: 'DC1-N9K-SPINE'
     border: 'DC1-N9K-BORDER'
     leaf: 'DC1-N9K-LEAF'
-
   # Ranges from which device addresses are created from. Must have the mask in prefix format (/)
   addr:
     lp_net: '192.168.100.0/32'          # Routing (OSPF/BGP), VTEP and VPC addresses. By default will use .11 to .59

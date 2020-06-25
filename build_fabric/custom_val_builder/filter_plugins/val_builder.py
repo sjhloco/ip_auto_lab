@@ -64,29 +64,25 @@ class FilterModule(object):
         result = self.compliance_report(desired_state, actual_state)
 
         # Unhash what you want to display on screen
-        # return desired_state
+        return desired_state
         # return actual_state
-        return result
+        # return result
 
 ############################################ Device data-model generators ############################################
 # Creates the data model from the out retruned by the device
 
     def device_dm(self, desired_state, json_output, actual_state):
         # actual_state = json_output
-        if list(desired_state.keys())[0] == "show ip int brief include-secondary vrf all":
-            vrf_list = []
-            for intf in json_output['TABLE_intf']['ROW_intf']:
-                vrf_list.append(intf['vrf-name-out'])
-            for vrf in set(vrf_list):
-                intf_list = defaultdict(dict)
-                for intf in json_output['TABLE_intf']['ROW_intf']:
-                    if vrf == intf['vrf-name-out']:
-                        intf_list[intf['intf-name']]['proto-state'] = intf['proto-state']
-                        intf_list[intf['intf-name']]['link-state'] = intf['link-state']
-                        intf_list[intf['intf-name']]['admin-state'] = intf['admin-state']
-                        intf.setdefault('prefix', None)
-                        intf_list[intf['intf-name']]['prefix'] = intf['prefix']
-                actual_state[vrf] = intf_list
+
+        actual_state = defaultdict(dict)
+        actual_state['peer-link_po'] = json_output['TABLE_peerlink']['ROW_peerlink']['peerlink-ifindex']
+        actual_state['peer-link_vlans'] = json_output['TABLE_peerlink']['ROW_peerlink']['peer-up-vlan-bitset']
+        actual_state['vpc_peer_keepalive_status'] = json_output['vpc-peer-keepalive-status']
+        actual_state['vpc_peer_status'] = json_output['vpc-peer-status']
+        for vpc in json_output['TABLE_vpc']['ROW_vpc']:
+            actual_state[vpc['vpc-ifindex']]['consistency_status'] = vpc['vpc-consistency-status']
+            actual_state[vpc['vpc-ifindex']]['port_status'] = vpc['vpc-port-state']
+            actual_state[vpc['vpc-ifindex']]['vpc_num'] = vpc['vpc-id']
+            actual_state[vpc['vpc-ifindex']]['active_vlans'] = vpc['up-vlan-bitset']
 
         return actual_state
-

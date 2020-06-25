@@ -29,7 +29,7 @@ vlan {{ vl.num }}
 
 {#### SVIs - IP assigned depends whether it is a L3VNI, SVI or redistributed SVI (uses default (L3VNI) or custom tag ####}
 {% for flt_tnt in flt_vars %}{% if flt_tnt.l3_tnt is sameas true %}
-{% for vl in flt_tnt.vlans %}
+{% for vl in flt_tnt.vlans %}{% if vl.ip_addr != None %}
 interface vlan{{ vl.num }}
   no shutdown
   vrf member {{ flt_tnt.tnt_name }}
@@ -44,7 +44,7 @@ interface vlan{{ vl.num }}
   ip address {{ vl.ip_addr }}
   fabric forwarding mode anycast-gateway
 {% endif %}
-{% endfor %}
+{% endif %}{% endfor %}
 {% endif %}{% endfor %}
 
 {#### VXLAN: Add L2VNI (if vlan number is not L3VNI vlan) or associate L3VNI (if L3_tenant) to NVE interface ####}

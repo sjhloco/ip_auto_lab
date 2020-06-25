@@ -1,22 +1,43 @@
 ---
 ### Uses custom_validate pluggin to verify that the actual state of OSPF, LAG and MLAG matches the desired state ###
-
 # 4a. TEMPLATE: Creates validation file of expected desired state from the input data
-- name: "Create desired state Validation files"
+- name: "SYS >> Creating {{ ansible_network_os }} bse_fbc custom_validate validation file"
+  template:
+    src: "{{ ansible_network_os }}/bse_fbc_val_tmpl.j2"
+    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
+  changed_when: False
+  tags: [cus_val_fbc_bse]
+
+- name: "BLK >> bse_fbc and svc_tnt custom_validate validation files"
   block:
-  - name: "SYS >> Creating the {{ ansible_network_os }} validation files"
+  - set_fact:
+      flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre, fbc.adv.mlag.peer_vlan) }}"
+  - name: "SYS >> Creating {{ ansible_network_os }} bse_fbc and svc_tnt custom_validate validation file"
     template:
-      src: "{{ ansible_network_os }}/val_tmpl.j2"
+      src: "{{ ansible_network_os }}/svc_tnt_val_tmpl.j2"
       dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
     changed_when: False
-  tags: val_tmpl
+  tags: [cus_val_tnt, cus_val_svc]
+
+- name: "BLK >> bse_fbc, svc_tnt and svc_intf custom_validate validation files"
+  block:
+  - set_fact:
+      flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre, fbc.adv.mlag.peer_vlan) }}"
+  - set_fact:
+      flt_svc_intf: "{{ svc_intf.intf |create_svc_intf_dm(inventory_hostname, svc_intf.adv, fbc.adv.bse_intf) }}"
+  - name: "SYS >> Creating {{ ansible_network_os }} bse_fbc, svc_tnt and svc_intf custom_validate validation file"
+    template:
+      src: "{{ ansible_network_os }}/svc_intf_val_tmpl.j2"
+      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
+    changed_when: False
+  tags: [cus_val_intf, cus_val_svc, cus_val, post_val, full]
 
 # 4b. CUSTOM: napalm_cli gets the actual state and custmised version of napalm_validate used to compare and report
 - name: "Create {{ ansible_network_os }} compliance report"
   block:
-#   # Loads the variable file and the genie parser role
+  # Loads the variable file
   - include_vars: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/{{ ansible_network_os }}_desired_state.yml"
-  - name: "NET >> Validating OSPF, Port-channels, VPC, VTEPs, VNIs and L3 interfaces"
+  - name: "NET >> Validating OSPF, Port-channels, VPC, VTEPs, VNIs and interfaces"
   # Generates actual_state using napalm_cli
     napalm_cli:
       provider: "{{ ans.creds_all }}"
@@ -42,6 +63,20 @@
       label: "{{ item.cli_results.keys() | list | first }}"
       index_var: lp_idx
   when: not ansible_check_mode          # Dont want to run validation in check_mode
+  tags: [cus_val_fbc_bse, cus_val_tnt, cus_val_intf, cus_val_svc, cus_val, post_val, full]
+
+# Use to test validation outputs
+# - name: "Print output to screen instead of asser"
+#   block:
+#   - set_fact:
+#   # Only True or False is returned to Assert module. The compliance report is added to the napalm_validate generated report
+#       test: "{{ cmds[lp_idx] | custom_validate(item.cli_results.values() | list | first, ans.dir_path, inventory_hostname, ansible_network_os) }}"
+#     loop: "{{ output.results }}"
+#     loop_control:
+#       label: "{{ item.cli_results.keys() | list | first }}"
+#       index_var: lp_idx
+#   - debug:
+#       var=test
 
 
 

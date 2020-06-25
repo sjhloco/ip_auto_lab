@@ -2,19 +2,25 @@
 
 ---
 # 4a. TEMPLATE: Creates validation file of expected desired state from the input data
-- name: "Create naplam desired state Validation files"
-  block:
-  - name: "SYS >> Creating the Napalm validation files"
-    template:
-      src: napalm/val_tmpl.j2
-      dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/napalm_desired_state.yml"
-    changed_when: False
-  tags: val_tmpl
+- name: "SYS >> Creating bse_fbc napalm_validate validation file"
+  template:
+    src: napalm/bse_fbc_val_tmpl.j2
+    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/napalm_desired_state.yml"
+  changed_when: False
+  tags: [nap_val_fbc_bse]
+
+- name: "SYS >> Creating bse_fbc and svc_tnt napalm_validate validation file"
+  template:
+    src: napalm/svc_tnt_val_tmpl.j2
+    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/validate/napalm_desired_state.yml"
+  changed_when: False
+  tags: [nap_val_tnt,nap_val_svc, nap_val, post_val, full]
+
 
 # 4b. NAPALM: Napalm_validate used to gather and compare actual and desired state on all device types
 - name: "Create napalm compliance report"
   block:
-  - name: "NET >> Validating Connections, BGP and Reachability"
+  - name: "NET >> Validating LLDP Connections, BGP and Reachability"
     # Generates actual_state and compares against the desired state
     napalm_validate:
       provider: "{{ ans.creds_all }}"
@@ -34,3 +40,4 @@
       msg: "Non-compliant state encountered. Refer to the full report in {{ ans.dir_path }}/reports/{{ inventory_hostname }}_compliance_report.json"
     when: not nap_val.compliance_report.complies
   when: not ansible_check_mode          # Dont want to run validation in check_mode
+  tags: [nap_val_fbc_bse, nap_val_tnt,nap_val_svc, nap_val, post_val, full]

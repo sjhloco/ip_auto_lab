@@ -21,6 +21,7 @@ var_dicts:
     - addr
   fabric:
     - network_size
+    - num_intf
     - bse_intf
     - lp
     - mlag

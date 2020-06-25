@@ -54,7 +54,7 @@ class FilterModule(object):
         report["complies"] = complies
 
         #If a compliance report exists adds to it, if not creates a new one.
-        filename = os.path.join(self.fix_home_path(directory), 'reports/', hostname + '_fbc_compliance_report.json')
+        filename = os.path.join(self.fix_home_path(directory), 'reports/', hostname + '_compliance_report.json')
         if os.path.exists(filename):
             with open(filename, 'r') as file_content:
                 existing_report = json.load(file_content)
@@ -79,7 +79,7 @@ class FilterModule(object):
 
         # Feeds the validation file and new data model through the reporting function
         result = self.compliance_report(desired_state, actual_state, directory, hostname)
-        # # Only the compliance report outcome is sent to Ansible Assert module, not the full report.
+        # Only the compliance report outcome is sent to Ansible Assert module, not the full report.
         if result["complies"] == True:
             return "'custom_validate passed'"
         else:
@@ -97,38 +97,47 @@ class FilterModule(object):
         # PO: Creates a dictionary from the device output to match the format of the validation file
         elif list(desired_state.keys())[0] == "show port-channel summary":
             actual_state = defaultdict(dict)
-            # Required due to shit NXOS JSON making dict rather than lisy if only 1 Po
+            # Required due to shit NXOS JSON making dict rather than list if only 1 Po
             if isinstance(json_output['TABLE_channel']['ROW_channel'], dict):
                 json_output['TABLE_channel']['ROW_channel'] = [json_output['TABLE_channel']['ROW_channel']]
             for po in json_output['TABLE_channel']['ROW_channel']:
-                actual_state[po['port-channel'].capitalize()]['oper_status'] = po['status']
+                actual_state[po['port-channel']]['oper_status'] = po['status']
+                actual_state[po['port-channel']]['protocol'] = po['prtcl']
                 po_mbrs = {}
                 # Required due to shit NXOS JSON not adding blank fields if no members
                 if len(po) == 7:
+                    if isinstance(po['TABLE_member']['ROW_member'], dict):
+                        po['TABLE_member']['ROW_member'] = [po['TABLE_member']['ROW_member']]
                     for mbr in po['TABLE_member']['ROW_member']:
                         # Creates dict of members to add to as value in the PO dictionary
                         po_mbrs[mbr['port']] = {'mbr_status': mbr['port-status']}
-                actual_state[po['port-channel'].capitalize()]['members'] = po_mbrs
+                actual_state[po['port-channel']]['members'] = po_mbrs
 
         # VDC: Creates a dictionary from the device output to match the format of the validation file
         elif list(desired_state.keys())[0] == "show vpc":
+            # actual_state['vpc_peer_keepalive_status'] = json_output['vpc-peer-keepalive-status']
+            # actual_state['vpc_peer_status'] = json_output['vpc-peer-status']
+            actual_state = defaultdict(dict)
+            actual_state['peer-link_po'] = json_output['TABLE_peerlink']['ROW_peerlink']['peerlink-ifindex']
+            actual_state['peer-link_vlans'] = json_output['TABLE_peerlink']['ROW_peerlink']['peer-up-vlan-bitset']
             actual_state['vpc_peer_keepalive_status'] = json_output['vpc-peer-keepalive-status']
             actual_state['vpc_peer_status'] = json_output['vpc-peer-status']
+            for vpc in json_output['TABLE_vpc']['ROW_vpc']:
+                actual_state[vpc['vpc-ifindex']]['consistency_status'] = vpc['vpc-consistency-status']
+                actual_state[vpc['vpc-ifindex']]['port_status'] = vpc['vpc-port-state']
+                actual_state[vpc['vpc-ifindex']]['vpc_num'] = vpc['vpc-id']
+                actual_state[vpc['vpc-ifindex']]['active_vlans'] = vpc['up-vlan-bitset']
+
 
         elif list(desired_state.keys())[0] == "show ip int brief include-secondary vrf all":
-            vrf_list = []
+            actual_state = defaultdict(dict)
             for intf in json_output['TABLE_intf']['ROW_intf']:
-                vrf_list.append(intf['vrf-name-out'])
-            for vrf in set(vrf_list):
-                intf_list = defaultdict(dict)
-                for intf in json_output['TABLE_intf']['ROW_intf']:
-                    if vrf == intf['vrf-name-out']:
-                        intf_list[intf['intf-name']]['proto-state'] = intf['proto-state']
-                        intf_list[intf['intf-name']]['link-state'] = intf['link-state']
-                        intf_list[intf['intf-name']]['admin-state'] = intf['admin-state']
-                        intf.setdefault('prefix', None)
-                        intf_list[intf['intf-name']]['prefix'] = intf['prefix']
-                actual_state[vrf] = intf_list
+                actual_state[intf['intf-name']]['proto-state'] = intf['proto-state']
+                actual_state[intf['intf-name']]['link-state'] = intf['link-state']
+                actual_state[intf['intf-name']]['admin-state'] = intf['admin-state']
+                actual_state[intf['intf-name']]['tenant'] = intf['vrf-name-out']
+                intf.setdefault('prefix', None)
+                actual_state[intf['intf-name']]['prefix'] = intf['prefix']
 
         elif list(desired_state.keys())[0] == "show nve peers":
             for peer in json_output['TABLE_nve_peers']['ROW_nve_peers']:
@@ -138,4 +147,19 @@ class FilterModule(object):
             for vni in json_output['TABLE_nve_vni']['ROW_nve_vni']:
                 actual_state[vni['vni']] = {'type': vni['type'], 'state': vni['vni-state']}
 
+        elif list(desired_state.keys())[0] == "show interface status":
+            actual_state = defaultdict(dict)
+            for intf in json_output['TABLE_interface']['ROW_interface']:
+                actual_state[intf['interface']]['state'] = intf['state']
+                actual_state[intf['interface']]['vlan'] = intf['vlan']
+                intf.setdefault('name', None)
+                actual_state[intf['interface']]['name'] = intf['name']
+
+        elif list(desired_state.keys())[0] == "show interface trunk":
+            actual_state = defaultdict(dict)
+            for allow_vlan, stp_vlan in zip(json_output['TABLE_allowed_vlans']['ROW_allowed_vlans'], json_output['TABLE_stp_forward']['ROW_stp_forward']):
+                actual_state[allow_vlan['interface']]['allowed_vlans'] = allow_vlan['allowedvlans']
+                actual_state[stp_vlan['interface']]['stpfwd_vlans'] = stp_vlan['stpfwd_vlans']
+
         return actual_state
+

@@ -5,12 +5,46 @@ class FilterModule(object):
             'create_svc_intf_dm': self.svc_intf_dm
         }
 
+    # Used to take VLANs and change sequental vlans so that they are separated by '-' as per the "trunk allowed vlans" config syntax
+    def vlan_seq(self, vlans):
+        # 1. Creates a list of all vlans, doesnt matter if int, or str spilt by ',' or '-'
+        vlan_list, vlan_seq_lists, vlan_seq = ([] for i in range(3))
+        if isinstance(vlans, int) == True:
+            vlan_list.append(vlans)
+        elif isinstance(vlans, list) == True:
+            vlan_list = vlans
+        else:
+            for vl in vlans.split(','):
+                if '-' in vl:
+                    for each_vl in range(int(vl.split('-')[0]), int(vl.split('-')[1]) +1):
+                        vlan_list.append(each_vl)
+                else:
+                    vlan_list.append(int(vl))
+        # 2. Order the list and create mini lists of sequnetial vlans
+        for vlan in sorted(vlan_list):
+            if not vlan_seq_lists:
+                vlan_seq_lists.append([vlan])
+                continue
+            if vlan_seq_lists[-1][-1] == vlan - 1:
+                    vlan_seq_lists[-1].append(vlan)
+            else:
+                vlan_seq_lists.append([vlan])
+        # 3. Join the mini lists together
+        for vlan in vlan_seq_lists:
+            if len(vlan) == 1:
+                vlan_seq.extend(vlan)
+            else:
+                vlan_seq.append('{}-{}'.format(vlan[0], vlan[-1]))
+        # Return it as one big string
+        return ','.join([str(elem) for elem in vlan_seq])
+
     # Creates 2 new seperate Data Models for Leaf and Border devices with only the tenants and vlans on those device roles and incorporating the VNIs
-    def svc_tnt_dm(self, srv_tnt, bse_vni, vni_incre):
+    def svc_tnt_dm(self, srv_tnt, bse_vni, vni_incre, vpc_peer_vlan):
         l3vni = bse_vni['l3vni']
         tnt_vlan = bse_vni['tnt_vlan']
         l2vni = bse_vni['l2vni']
         border_tnt, leaf_tnt = ([] for i in range(2))
+        bdr_vlan_numb, lf_vlan_numb = ([1, vpc_peer_vlan] for i in range(2))
 
         # Looping through current DM of tenants creates new per-device-role (border or leaf) DM of tenants
         for tnt in srv_tnt:
@@ -51,9 +85,22 @@ class FilterModule(object):
 
             # Adds the L3VNI VLAN (not used in template if not a L3_tnt) and creates seperate lists of L3 tenants (and vlans) per device-role
             if len(border_vlans) != 0:
+                # Creates a list of just all the VLAN numbers on border switches
+                for vl in border_vlans.copy():
+                    bdr_vlan_numb.append(vl['num'])
+                if tnt['l3_tenant'] == True:
+                    bdr_vlan_numb.append(tnt_vlan)
+                # Creates the new leaf DM of tenant & vlan properties
                 border_vlans.append({'name': tnt['tenant_name'] + '_L3VNI' , 'num': tnt_vlan, 'ip_addr': 'l3_vni', 'ipv4_bgp_redist': False, 'vni': l3vni})
                 border_tnt.append({'tnt_name': tnt['tenant_name'], 'l3_tnt': tnt['l3_tenant'], 'l3vni': l3vni, 'tnt_vlan': tnt_vlan, 'tnt_redist': tnt_redist, 'bgp_redist_tag': tnt['bgp_redist_tag'], 'vlans': border_vlans})
+
             if len(leaf_vlans) != 0:
+                # Creates a list of just the VLAN numbers on leaf switches
+                for vl in leaf_vlans.copy():
+                    lf_vlan_numb.append(vl['num'])
+                if tnt['l3_tenant'] == True:
+                    lf_vlan_numb.append(tnt_vlan)
+                # Creates the new leaf DM of enant & vlan properties
                 leaf_vlans.append({'name': tnt['tenant_name'] + '_L3VNI' , 'num': tnt_vlan, 'ip_addr': 'l3_vni', 'ipv4_bgp_redist': False, 'vni': l3vni})
                 leaf_tnt.append({'tnt_name': tnt['tenant_name'], 'l3_tnt': tnt['l3_tenant'], 'l3vni': l3vni, 'tnt_vlan': tnt_vlan, 'tnt_redist': tnt_redist, 'bgp_redist_tag': tnt['bgp_redist_tag'], 'vlans': leaf_vlans})
 
@@ -61,7 +108,7 @@ class FilterModule(object):
             l3vni = l3vni + vni_incre['l3vni']
             tnt_vlan = tnt_vlan + vni_incre['tnt_vlan']
 
-        return [leaf_tnt, border_tnt]
+        return [leaf_tnt, border_tnt, self.vlan_seq(lf_vlan_numb), self.vlan_seq(bdr_vlan_numb)]
 
     def svc_intf_dm(self, all_homed, hostname, intf_adv, bse_intf):
         sl_hmd = intf_adv['single_homed']
@@ -80,6 +127,8 @@ class FilterModule(object):
                 elif homed == 'dual_homed':
                     intf['dual_homed'] = True
                     intf.setdefault('po_mode', 'active')
+                    if intf['po_mode'] == True:      # Needed as 'on' in yaml is converted to True
+                        intf['po_mode'] = "on"
                     intf.setdefault('po_num', None)
                 # STP dict is added based on Layer2 port type
                 if intf['type'] == 'access':
@@ -162,6 +211,11 @@ class FilterModule(object):
             all_intf.append(intf)
             all_intf.append({'intf_num': ec_fmt + str(intf['po_num']), 'descr': intf['descr'], 'type': intf['type'],
                              'ip_vlan': intf['ip_vlan'], 'vpc_num': intf['po_num'], 'stp': intf['stp']})
+
+        # Adjusts allowed VLAN ranges if sequential (is only needed for post_val, config would automatically do it anyway)
+        for intf in all_intf:
+            if 'trunk' in intf['type'] and isinstance(intf['ip_vlan'], str) == True:
+                intf['ip_vlan'] = self.vlan_seq(intf['ip_vlan'])
 
         return all_intf
 

@@ -1,29 +1,4 @@
 ###################### Service: Device Ports ######################
-# By default all interfaces are dual-homed with an LACP state of 'active'. Only the odd numbered switch needs to be specified in the variable file.
-# The VPC number can not be changed, it will always be the same as the port-channel number.
-# Interfaces and POs can be assigned from a pool or specified manually.
-
-# Are 5 types of interface that can be specified:
-# -access: A L2 single VLAN access port. STP is set to 'edge'
-# -stp_trunk: A L2 trunk port going to a device that supports STP. STP is set to 'network' so the other device must support Brige Assurance
-# -stp_trunk_non_ba: Same as stp_trunk but sets STP will be set to 'normal' for devices that dont support BA
-# -non_stp_trunk: A L2 trunk port going to a device that doesnt support BPDU. STP set to 'edge' and BPDU Guard enabled
-# -layer3: A non-switchport L3 interface with an IP address
-
-# Interfaces are defined as a dictionary value for the single_homed or dual-homed key.
-# At a minimun the following settings need to be configured:
-# - single_homed: or dual-homed:
-#  - descr: string
-#  - type: access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3
-#  - ip_vlan: vlan or ip            Depends on the type, either ip/prefifx, vlan or multiple vlans separated by ,
-#  - switch: name                   Name of switch to create on. If dual-homed needs to be odd switch number from MLAG pair
-#  - tenant: name                   Layer3 interfaces only, is the VRF the interface will be in*
-
-# To statically assign the interface and/or port-channel number (default is dynamically from a range) add either of these 2 extra dictionaries to the interface.
-# The values used can overlap with the dynamic interface range however for simplicty would advise to use a separate range for dynamic and static assignments.
-#  - intf_num: integrar             Only specify the number, name is got from the fbc.adv.bse_intf.intf_fmt variable
-#  - po_num: integrar               Only specify the number, name is got from the fbc.adv.bse_intf.ec_fmt variable
-
 
 #### Base variables ####
 # If not using single-homed or dual-homed interfaces make sure the dictionary (*single_homed* or *dual_homed*) is hashed out.
@@ -80,6 +55,7 @@ svc_intf:
         switch: DC1-N9K-LEAF01
         intf_num: 45
         po_num: four
+        po_mode: act
       - descr: UPLINK > DC1-VIOS-SW1
         type: stp_trunk
         ip_vlan: 110, 120
@@ -101,8 +77,12 @@ svc_intf:
         po_num: 66
       - descr: UPLINK > DC1-VIOS-DMZ01
         type: stp_trunk_non_ba
-        ip_vlan: 110,120,10
+        ip_vlan: 110-112,120,10
         switch: DC1-N9K-BORDER02
+      - descr: UPLINK > DC1-VIOS-DMZ01
+        type: stp_trunk_non_ba
+        ip_vlan: 110-112,120,110
+        switch: DC1-N9K-LEAF01
 
 #### Advanced variables ####
 # Reserved interface ranges that server ports can be automatically assigned from (applies to all leaf and border switches)

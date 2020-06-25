@@ -15,7 +15,7 @@ hardware access-list tcam region arp-ether 256 double-wide
 system default switchport shutdown
 no nxapi http
 nxapi https port 443
-nxapi use-vrf management
+{# nxapi use-vrf management #}
 no nxapi ssl ciphers weak
 nxapi ssl protocols TLSv1.1 TLSv1.2
 xml server timeout 1200

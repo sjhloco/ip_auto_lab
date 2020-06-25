@@ -28,17 +28,25 @@ svc_tnt:
           ip_addr: 10.10.10.1/24
         - num: 20
           name: dev
-          ip_addr: 10.10.12.1/24
+          ip_addr: 10.10.20.1/24
         - num: 24
           name: servers
-          ip_addr: 10.10.11.1/24
+          ip_addr: 10.10.24.1/24
         - num: 30
           name: lb_vips
-          ip_addr: 10.10.20.1/24
+          ip_addr: 10.10.30.1/24
           ipv4_bgp_redist: False
         - num: 40
           name: ha_keepalive
-          create_on_leaf: False
+        - num: 12
+          name: storage
+          ip_addr: 10.10.12.1/24
+        - num: 11
+          name: apps
+          ip_addr: 10.10.11.1/24
+        - num: 13
+          name: compute
+          ip_addr: 10.10.13.1/24
 
     - tenant_name: GRN
       l3_tenant: True
@@ -48,6 +56,10 @@ svc_tnt:
           ip_addr: 10.250.110.1/24
           create_on_border: True
           ipv4_bgp_redist: False
+        - num: 111
+          name: grn-svc
+        - num: 112
+          name: grn-mgmt
         - num: 120
           name: grn-mail
           ip_addr: 10.250.120.1/24

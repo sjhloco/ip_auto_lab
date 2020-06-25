@@ -27,7 +27,7 @@ svc_tnt:
           name: data
           ip_addr: 10.10.10.1/24
         - num: dev
-          name: dev
+          name: amb-mail
           ip_addr: 10.10.12.1/24
         - num: 24
           name: servers
@@ -39,6 +39,8 @@ svc_tnt:
         - num: 40
           name: ha_keepalive
           create_on_leaf: False
+        - num: 110
+          name: grn-web
 
     - tenant_name:
       l3_tenant: Tru

@@ -2,7 +2,7 @@ class FilterModule(object):
     def filters(self):
         return {
             'create_svc_tnt_dm': self.svc_tnt_dm,
-            # 'srv_ports_dm': self.srv_ports_dm
+            'create_svc_intf_dm': self.svc_intf_dm
         }
 
     # Creates 2 new seperate Data Models for Leaf and Border devices with only the tenants and vlans on those device roles and incorporating the VNIs
@@ -63,52 +63,105 @@ class FilterModule(object):
 
         return [leaf_tnt, border_tnt]
 
+    def svc_intf_dm(self, all_homed, hostname, intf_adv, bse_intf):
+        sl_hmd = intf_adv['single_homed']
+        dl_hmd = intf_adv['dual_homed']
+        intf_fmt = bse_intf['intf_fmt']
+        ec_fmt = bse_intf['ec_fmt']
+        all_intf, have_intf, sl_need_intf, dl_need_intf, all_intf_num, sl_range, dl_range, need_po, all_po_num, po_range = ([] for i in range(10))
 
+        # 1. DEFAULTS: Fill out default values and change the nested dict into a list
+        for homed, interfaces in all_homed.items():
+            for intf in interfaces:
+                # Adds homed as a dict and adds some default value dicts
+                intf.setdefault('intf_num', None)
+                if homed == 'single_homed':
+                    intf['dual_homed'] = False
+                elif homed == 'dual_homed':
+                    intf['dual_homed'] = True
+                    intf.setdefault('po_mode', 'active')
+                    intf.setdefault('po_num', None)
+                # STP dict is added based on Layer2 port type
+                if intf['type'] == 'access':
+                    intf['stp'] = 'edge'
+                elif intf['type'] == 'stp_trunk':
+                    intf['stp'] = 'network'
+                elif intf['type'] == 'stp_trunk_non_ba':
+                    intf['stp'] = 'normal'
+                elif intf['type'] == 'non_stp_trunk':
+                    intf['stp'] = 'edge'
+                all_intf.append(intf)
 
+        # 2. FILTER: Deletes interfaces not on this switch and separates the defined and non-defined ports for single and dual-homed
+        for intf in all_intf:
+            if intf['dual_homed'] == False and intf['switch'] == hostname:
+                if intf['intf_num'] == None:
+                    sl_need_intf.append(intf)
+                else:
+                    all_intf_num.append(intf['intf_num'])                       # List of all used interface numbers
+                    intf['intf_num'] = intf_fmt + str(intf['intf_num'])         # Adds the interface name to the number
+                    have_intf.append(intf)
+            # Dual-homed interfaces need to be created on both MLAG pairs so logic matches both hostnames
+            elif intf['dual_homed'] == True and (intf['switch'] == hostname or intf['switch'] == hostname[:-2] + "{:02d}".format(int(hostname[-2:]) -1)):
+                if intf['intf_num'] == None:
+                    dl_need_intf.append(intf)
+                else:
+                    all_intf_num.append(intf['intf_num'])
+                    intf['intf_num'] = intf_fmt + str(intf['intf_num'])
+                    have_intf.append(intf)
+            del intf['switch']                  # Removes as no longer needed
 
-#  # Create a new ports data model including interface and Po info
-#     def srv_ports_dm(self, srv_ports, srv_ports_adv, srv_tenants):
-#         ### 1. First need to create seperate lists for single and dual homed so can use loop index to increment interafce number ###
-#         sh_ports = []
-#         dh_ports = []
-#         # Split the single and dual homed start interface into a list of two elements (port type and number)
-#         sh_first = srv_ports_adv['single_homed']['first_int'].split('/')
-#         dh_first = srv_ports_adv['dual_homed']['first_int'].split('/')
+        # 3. INTF_RANGES: Adjust interface assignment ranges to remove any already used interfaces
+        for intf_num in range(dl_hmd['first_intf'], dl_hmd['last_intf'] + 1):
+            dl_range.append(intf_num)
+        dl_range = set(dl_range) - set(all_intf_num)
+        dl_range = list(dl_range)
+        dl_range.sort()
+        for intf_num in range(sl_hmd['first_intf'], sl_hmd['last_intf'] + 1):
+            sl_range.append(intf_num)
+        sl_range = set(sl_range) - set(all_intf_num)
+        sl_range = list(sl_range)
+        sl_range.sort()
 
-#         ### 1. Use iteration number (index) to increment interface and add to the dictionary
-#         # Create single-homed interfaces
-#         for index, port in enumerate(srv_ports['single_homed']):
-#             int_num = str(int(sh_first[1]) + index)                     # Adds the index to the start port number
-#             port['interface'] = sh_first[0] + '/' + int_num             # Creates a new dict element for interface number
-#             sh_ports.append(port)                                   # Adds all single-homed port dictonaries to a list
+        # 4a. SINGLE-HOMED: Adds the interface number to existing DM
+        for intf, int_num in zip(sl_need_intf, sl_range):
+            if intf['dual_homed'] == False:
+                intf['intf_num'] = intf_fmt + str(int_num)
+                have_intf.append(intf)
+        # 4b. DUAL-HOMED: Adds the interface number to existing DM
+        for intf, int_num in zip(dl_need_intf, dl_range):
+            if intf['dual_homed'] == True:
+                intf['intf_num'] = intf_fmt + str(int_num)
+                have_intf.append(intf)
 
-#         # Create dual-homed interfaces,POs and VPC
-#         for index, port in enumerate(srv_ports['dual_homed']):
-#             int_num = str(int(dh_first[1]) + index)
-#             port['interface'] = dh_first[0] + '/' + int_num             # Used 2 different ways to add to dictionary, could have used either
-#             port.update({'vpc': srv_ports_adv['dual_homed']['vpc'] + index, 'po': srv_ports_adv['dual_homed']['po'] + index})
-#             dh_ports.append(port)                                   # Adds all dual-homed port dictonaries to a list
+        # 5. PO: Adds PO to interface and adds a port-channel interface with the VPC number
+        all_intf = []
+        for intf in have_intf:
+            if intf['dual_homed'] == True:
+                # If no PO number (none) adds to new list
+                if intf['po_num'] == None:
+                    need_po.append(intf)
+                else:
+                    # If PO number is defined creates new PO interface and adds VPC number
+                    all_po_num.append(intf['po_num'])
+                    all_intf.append(intf)
+                    all_intf.append({'intf_num': ec_fmt + str(intf['po_num']), 'descr': intf['descr'], 'type': intf['type'],
+                                     'ip_vlan': intf['ip_vlan'], 'vpc_num': intf['po_num'], 'stp': intf['stp']})
+            else:
+                all_intf.append(intf)
 
-#         ### 2. FAIL-FAST: Only return new dictionaires if havent reached the interface limit
-#         num_sh = []
-#         num_dh = []
-#         # Works out the max number of interfaces that would be available
-#         sh_limit = int(srv_ports_adv['single_homed']['last_int'].split('/')[1]) - int(sh_first[1]) + 1
-#         dh_limit = int(srv_ports_adv['dual_homed']['last_int'].split('/')[1]) - int(dh_first[1]) + 1
+        # Adjust PO assignment ranges to remove any already used POs
+        for po_num in range(dl_hmd['first_po'], dl_hmd['last_po'] + 1):
+            po_range.append(po_num)
+        po_range = set(po_range) - set(all_po_num)
+        po_range = list(po_range)
+        po_range.sort()
+        # Adds PO to interface and adds a port-channel interface with the VPC number
+        for intf, po_num in zip(need_po, po_range):
+            intf['po_num'] = po_num
+            all_intf.append(intf)
+            all_intf.append({'intf_num': ec_fmt + str(intf['po_num']), 'descr': intf['descr'], 'type': intf['type'],
+                             'ip_vlan': intf['ip_vlan'], 'vpc_num': intf['po_num'], 'stp': intf['stp']})
 
-#         # Gets switch names from port dictionaries
-#         for sh_swi in sh_ports:
-#             num_sh.append(sh_swi ['switch'])
-#         for dh_swi in dh_ports:
-#             num_dh.append(dh_swi ['switch'])
+        return all_intf
 
-#         # Counts the number of ports on each switch and returns error if is higher than limit
-#         for sw_name, sw_count in dict(Counter(num_sh)).items():
-#             if sw_count > sh_limit:     # If the number of switch ports is more than the limit
-#                 return 'Error: No single-homed ports left on ' + sw_name
-#         for sw_name, sw_count in dict(Counter(num_dh)).items():
-#             if sw_count > dh_limit:     # If the number of switch ports is more than the limit
-#                 return 'Error: No dual-homed ports left on ' + sw_name
-
-#         # 3. Returns a dictionary containing both dictionaries
-#         return {'sh_ports': sh_ports, 'dh_ports': dh_ports}

@@ -3,10 +3,9 @@
 
 - name: "Create the tenant configuration snippets"
   block:
-  - include_vars: "vars/services_tenant.yml"
   - name: "SYS >> Creating per-device-role service_tenant data-models"
     set_fact:
-      flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre) }}"   # Completes data-model with VNI
+      flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre, fbc.adv.mlag.peer_vlan) }}"   # Completes data-model with VNI
     changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False             # These tasks still make changes when in check mode
   run_once: true                # Only has to run once to create the new data-models

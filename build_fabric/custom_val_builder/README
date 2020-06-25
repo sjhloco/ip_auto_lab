@@ -1,9 +1,14 @@
 Use to create the strucutre for the jinja template and device output data-model to use in the validate role
 
-Can either run against device or a static dictionary file
+Can just run the the template rendering or either run against device or a static dictionary file
 ansible-playbook playbook.yml -i hosts --tag tmpl
 ansible-playbook playbook.yml -i hosts --tag dev_val
 ansible-playbook playbook.yml -i hosts --tag file_val
+
+In the 'custom_validate' method unhash any of these to print oout the rendered template, the device output or the result of the validation:
+return desired_state
+return actual_state
+return result
 
 If using strict_mode it has to be at the level where you want to enforce it. For example to enforce that only these VNIs re present
   - show nve vni:
@@ -12,22 +17,33 @@ If using strict_mode it has to be at the level where you want to enforce it. For
         type: L2 [110]
         state: Up
 
-
 =========================================  Develop new validation test =========================================
 The method for developing new validations is as follows:
 
-=1. Add the cmd you want to validate to the var_template.j2 as an empty dictionary
+=1. Add any varaible or plugin files that may be needed
+
+=2. CMD_TO_VALIDATE: Add the cmd you want to validate to the var_template.j2 as an empty dictionary
 cmds:
   - show nve peers:
       dummy: dummy
 
-=2. In val_builder.py unhash the following under the device_dm method (should be no other lines under the method)
+=3. PRNT_OUTPUT: In filter_plugins/val_builder.py unhash the following under the 'device_dm' method (should be no other lines under this in the method)
 actual_state = json_output
 
-=3. Unhash 'result actual_state' and run the script to get back cmd output which can now be used to create DM and validation file.
-ansible-playbook playbook.yml -i hosts --tag dev_val
+In the 'custom_validate' method hash 'result report' and unhash 'result actual_state' and run the script to get back cmd output which can now be used to create DM and validation file.
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag dev_val
 
-=4. Write up how your validation file should look in var_template.j2
+Now you now what you will get back from the switch you have to create your desired adn expected Data models, can be done in any order:
+
+=4a. INPUT_DM: Rehash "actual_state = json_output" and write the 'device_dm' method to manipulate the date returned from the device into the new data model. Rerun play to make sure is as expected.
+        if list(desired_state.keys())[0] == "show ip ospf neighbors detail":
+            for nhbr in json_output['TABLE_ctx']['ROW_ctx']['TABLE_nbr']['ROW_nbr']:
+                actual_state[nhbr['rid']] = {'state': nhbr['state']}
+
+=4b. INPUT_DM_FILE (optional). put this output in files/file_input.json and test with --tag file_val rather than having to connect to device each time.
+{"192.168.100.11": {"state": "FULL"}, "192.168.100.12": {"state": "FULL"},"192.168.100.22": {"state": "FULL"}}
+
+=4c. STATIC_DESIRED_DM: Write up how your validation file should look in var_template.j2. In the 'custom_validate' method hash 'result actual_state' and unhash 'result report' to test validation.
   - show ip ospf neighbors detail:
       192.168.100.11:
         state: FULL
@@ -36,15 +52,8 @@ ansible-playbook playbook.yml -i hosts --tag dev_val
       192.168.100.22:
         state: FULL
 
-=5. In files/file_input.json add your expected actual_state and test with --tag file_val
-{"192.168.100.11": {"state": "FULL"}, "192.168.100.12": {"state": "FULL"},"192.168.100.22": {"state": "FULL"}}
-
-=6. From this now edit the method so that device output is formated into thei date model and test with --tag dev_val
-        if list(desired_state.keys())[0] == "show ip ospf neighbors detail":
-            for nhbr in json_output['TABLE_ctx']['ROW_ctx']['TABLE_nbr']['ROW_nbr']:
-                actual_state[nhbr['rid']] = {'state': nhbr['state']}
-
-=7. Create your template to create the desired state dynamically from the variable files.
+=4d. DYNAMIC_DESIRED_DM: Create your template to create the desired state dynamically from the variable files.
+In the 'custom_validate' method hash 'result report' and unhash 'result desired_state' to test view output of rednered template
   - show ip ospf neighbors detail:
 {% if bse.device_name.spine in inventory_hostname %}
 {% for x in groups[bse.device_name.leaf.split('-')[-1].lower()] + groups[bse.device_name.border.split('-')[-1].lower()] %}
@@ -64,7 +73,7 @@ ansible-playbook playbook.yml -i hosts --tag dev_val
         state: FULL
  {% endif %}
 
-=8. Once happy that this works can move into 'roles/validate/filter_plugin/custom_validate.py' and 'roles/validate/templates/nxos/val_tmpl.j2'
+=5. Once happy that this works can move into 'roles/validate/filter_plugin/custom_validate.py' and 'roles/validate/templates/nxos/val_tmpl.j2'
 
 
 =========================================  Errors =========================================

@@ -28,7 +28,7 @@ svc_tnt.tnt.vlans.create_on_border: Ensures answer is boolean
 svc_tnt.tnt.vlans.create_on_leaf: Ensures answer is boolean
 svc_tnt.tnt.vlans.ipv4_bgp_redist: Ensures answer is boolean
 svc_tnt.tnt.vlans.ip_addr: Ensures that the IP address is of the correct format
-svc_tnt.tnt.vlans.num: Ensures all the VLAN numbers are unique, no duplicates
+svc_tnt.tnt.vlans.num/name: Ensures all VLAN numbers and names are unique, no duplicates accross all tenants
 svc_tnt.adv.bse_vni): Ensures all values are integers
 svc_tnt.adv.bgp.ipv4_redist_rm_name: Ensures that it contains both 'vrf' and 'as'
 
@@ -36,10 +36,11 @@ svc_tnt.adv.bgp.ipv4_redist_rm_name: Ensures that it contains both 'vrf' and 'as
 svc_intf.intf.homed: Ensures that single-homed or dual-homed dictionaries are not empty
 svc_intf.intf.homed.intf_num: Ensures that intf_num is integrar (also added to a new list to check interface assignment)
 svc_intf.intf.dual_homed.po_num: Ensures that po_num is integrar (also added to a new list to check interface assignment)
+svc_intf.intf.dual_homed.po_mode: Ensures that po_mode is on, active or passive
 svc_intf.intf.homed.switch: Ensures that it is a valid hostname within the inventory and if dual-homed the hostname is odd numbered
 svc_intf.intf.single_homed.ip_vlan: Ensures that the the IP address is in a valid IPv4 format
 svc_intf.intf.homed.ip_vlan: Ensures all VLANs are integrers (numbers)
-svc_intf.intf.homed.ip_vlan: Ensures that there are no whitespaces and each vlan is an integrer (number)
+svc_intf.intf.homed.ip_vlan: Ensures that trunk VLANs have no whitespaces, are integrers (number) and no duplicates
 svc_intf.intf.single_homed.tenant: Ensures that the VRF exists on the switch that an interface in that VRF is being configured
 svc_intf.intf.homed.ip_vlan: Ensures that the VLAN exists on the switch that an interface using that VLAN is being configured
 svc_intf.adv.homed.first/last: Ensures that the reserved interface and Port-Channel ranges are integrers
@@ -175,12 +176,12 @@ class FilterModule(object):
         # NETWORK_SIZE (fbc.network_size): Ensures they are integers and the number of each type of device is within the limits and constraints
         for dev_type, net_size in network_size.items():
             self.assert_integrer(fabric_errors, net_size, "-fbc.network_size.{} '{}' should be an integrer numerical value".format(dev_type, net_size))
-        self.assert_regex_match(fabric_errors, '[1-4]', str(network_size['num_spines']),
-                                "-fbc.network_size.num_spines is '{}', valid values are 1 to 4".format(network_size['num_spines']))
-        self.assert_regex_match(fabric_errors, '^([2468]|10)$', str(network_size['num_leafs']),
-                                "-fbc.network_size.num_leafs is '{}', valid values are 2, 4, 6, 8 and 10".format(network_size['num_leafs']))
-        self.assert_regex_match(fabric_errors, '^[024]$', str(network_size['num_borders']),
-                                "-fbc.network_size.num_borders is '{}', valid values are 0, 2 and 4".format(network_size['num_borders']))
+        self.assert_regex_match(fabric_errors, '[1-4]', str(network_size['num_spine']),
+                                "-fbc.network_size.num_spine is '{}', valid values are 1 to 4".format(network_size['num_spine']))
+        self.assert_regex_match(fabric_errors, '^([2468]|10)$', str(network_size['num_leaf']),
+                                "-fbc.network_size.num_leaf is '{}', valid values are 2, 4, 6, 8 and 10".format(network_size['num_leaf']))
+        self.assert_regex_match(fabric_errors, '^[024]$', str(network_size['num_border']),
+                                "-fbc.network_size.num_border is '{}', valid values are 0, 2 and 4".format(network_size['num_border']))
 
         # NUMBER_INTERFACES (fbc.num_intf): Ensures is one number, then a comma and then upto 3 numbers
         for dev_type, intf in num_intf.items():
@@ -251,6 +252,9 @@ class FilterModule(object):
 
 ############ Validate formatting of variables within the service_tenant.yml file ############
     def svc_tnt(self, svc_tnt, adv):
+        # Used by duplicate VLAN check
+        all_vl_num, all_vl_name, dup_vl_num, dup_vl_name = ([] for i in range(4))
+        uniq_vl_num, uniq_vl_name = ({} for i in range(2))
         svc_tnt_errors = ['Check the contents of services_tenant.yml for the following issues:']
 
         for tnt in svc_tnt:
@@ -268,12 +272,10 @@ class FilterModule(object):
                 svc_tnt_errors.append(str(e))
                 return svc_tnt_errors       # Has to exit if this errors as other tests wont run due to it being unbale to loop through the vlans
 
-            # Used by duplicate VLAN check
-            dup_vl = []
-            uniq_vl = {}
-
             for vl in tnt['vlans']:
-                # VLAN_NUMBER (svc_tnt.tnt.vlans.num): Ensures all VLANs are numbers and not conflicting
+                all_vl_num.append(vl['num'])
+                all_vl_name.append(vl['name'])
+                # VLAN_NUMBER (svc_tnt.tnt.vlans.num): Ensures all VLANs are numbers
                 self.assert_integrer(svc_tnt_errors, vl['num'], "-svc_tnt.tnt.vlans.num '{}' should be an integrer numerical value".format(vl['num']))
 
                 # VLAN_NAME (svc_tnt.tnt.vlans.name): Ensures all VLANs have a name, are no restrictions of what it is
@@ -292,15 +294,24 @@ class FilterModule(object):
                 # IP_ADDR (svc_tnt.tnt.vlans.ip_addr): Ensures that the IP address is of the correct format
                 self.assert_ipv4(svc_tnt_errors, vl['ip_addr'], "-svc_tnt.tnt.vlans.ip_addr '{}' is not a valid IPv4 Address/Netmask".format(vl['ip_addr']))
 
-                # DUPLICATE VLANS (svc_tnt.tnt.vlans.num): Ensures all the VLAN numbers are unique, no duplicates
-                if vl['num'] not in uniq_vl:
-                    uniq_vl[vl['num']] = 1
-                else:
-                    if uniq_vl[vl['num']] == 1:
-                        dup_vl.append(vl['num'])
-                    uniq_vl[vl['num']] += 1
-            self.assert_equal(svc_tnt_errors, len(dup_vl), 0,
-                              "svc_tnt.tnt.vlans.num {} is duplicated in tenant '{}', all VLANs within a tenant should be unique".format(dup_vl, tnt['tenant_name']))
+        # DUPLICATE VLAN NUM/NAME (svc_tnt.tnt.vlans.num/name): Ensures all VLAN numbers and names are unique, no duplicates accross all tenants
+        for vl_num, vl_name in zip(all_vl_num, all_vl_name):
+            # Generates a list of duplicate VLAN numbers
+            if vl_num not in uniq_vl_num:
+                uniq_vl_num[vl_num] = 1
+            elif vl_num in uniq_vl_num:
+                if uniq_vl_num[vl_num] == 1:
+                    dup_vl_num.append(vl_num)
+                uniq_vl_num[vl_num] += 1
+             # Generates a list of duplicate VLAN names
+            if vl_name not in uniq_vl_name:
+                uniq_vl_name[vl_name] = 1
+            elif vl_name in uniq_vl_name:
+                if uniq_vl_name[vl_name] == 1:
+                    dup_vl_name.append(vl_name)
+                uniq_vl_name[vl_name] += 1
+        self.assert_equal(svc_tnt_errors, len(dup_vl_num), 0, "-svc_tnt.tnt.vlans.num {} are duplicated, all VLAN numbers should be unique".format(dup_vl_num))
+        self.assert_equal(svc_tnt_errors, len(dup_vl_name), 0, "-svc_tnt.tnt.vlans.name {} are duplicated, all VLAN names should be unique".format(dup_vl_name))
 
         # BASE_VNI (svc_tnt.adv.bse_vni): Ensures all values are integers
         for opt in ['tnt_vlan', 'l3vni', 'l2vni']:
@@ -318,12 +329,17 @@ class FilterModule(object):
 
 
 ############ Validate formatting of variables within the service_interface.yml file ############
-    def svc_intf(self, svc_intf, adv, hosts, tenants, dev_name, num_intf):
+    def svc_intf(self, svc_intf, adv, network_size, tenants, dev_name, num_intf):
         sh_per_dev_intf, dh_per_dev_intf, per_dev_po, per_dev_intf = (defaultdict(list) for i in range(4))
         svcintf_vrf_on_lf, svcintf_vl_on_lf, svcintf_vrf_on_bdr, svcintf_vl_on_bdr = ([] for i in range(4))
         svctnt_vrf_on_lf, svctnt_vl_on_lf, svctnt_vrf_on_bdr, svctnt_vl_on_bdr = ([] for i in range(4))
-        sh_intf, dh_intf, po_intf = ([] for i in range(3))
+        sh_intf, dh_intf, po_intf, all_devices = ([] for i in range(4))
         svc_intf_errors = ['Check the contents of services_interface.yml for the following issues:']
+
+        # Creates a list of all possible devices based on fabric size
+        for dev_type in ['spine', 'leaf', 'border']:
+            for dev_id in range(1, network_size['num_' + dev_type ] + 1):
+                all_devices.append(dev_name[dev_type] + str("%02d" % dev_id))
 
         # Creates lists what VRFs and VLANs are on leafs and borders switches (got from services.tenant.yml)
         for tnt in tenants:
@@ -362,8 +378,15 @@ class FilterModule(object):
                 if intf.get('po_num') != None:
                     self.assert_integrer(svc_intf_errors, intf['po_num'], "-svc_intf.intf.dual_homed.po_num '{}' should be an integrer numerical value".format(intf['po_num']))
 
-                # SWITCH_NAME (svc_intf.intf.homed.switch): Ensures that it is a valid hostname within the inventory and if dual-homed the hostname is odd numbered
-                self.assert_in(svc_intf_errors, intf['switch'], hosts, "-svc_intf.intf.{}.switch '{}' is not a valid hostname within the inventory".format(homed, intf['switch']))
+                # PO_MODE (svc_intf.intf.dual_homed.po_mode): Ensures that po_mode is on, active or passive
+                if intf.get('po_mode') != None:
+                    if intf.get('po_mode') == True:     # Needed as 'on' in yaml is converted to True
+                        intf['po_mode'] = 'on'
+                    self.assert_regex_match(svc_intf_errors, '^(active|passive|on)$', intf['po_mode'],
+                                            "-svc_intf.intf.dual_homed.po_mode '{}' not a valid Port-Channel mode, options are active, passive or on".format(intf['po_mode']))
+
+                #  SWITCH_NAME (svc_intf.intf.homed.switch): Ensures that it is a valid hostname within the inventory and if dual-homed the hostname is odd numbered
+                self.assert_in(svc_intf_errors, intf['switch'], all_devices, "-svc_intf.intf.{}.switch '{}' is not a valid hostname within the inventory".format(homed, intf['switch']))
                 if homed == 'dual_homed':
                     self.assert_not_equal(svc_intf_errors, int(intf['switch'][-2:]) % 2, 0,
                                           "-svc_intf.intf.dual_homed.switch '{}' should be an odd numbered MLAG switch".format(intf['switch']))
@@ -381,22 +404,37 @@ class FilterModule(object):
                     self.assert_integrer(svc_intf_errors, intf['ip_vlan'], "-svc_intf.intf.{}.ip_vlan VLAN '{}' should be an integrer numerical value".format(homed, intf['ip_vlan']))
                     svcinft_vlan(intf['switch'], intf.get('ip_vlan'))
 
-                # TRUNK_VLAN (svc_intf.intf.homed.ip_vlan): Ensures that there are no whitespaces and each vlan is an integrer (number)
+                # TRUNK_VLAN (svc_intf.intf.homed.ip_vlan): Ensures that there are no whitespaces
                 else:
-                    try:
-                        assert re.search(r'\s', str(intf['ip_vlan'])) == None, "-svc_intf.intf.{}.ip_vlan '{}' should not have any whitespaces in it".format(homed, intf['ip_vlan'])
-                    except AssertionError as e:
-                        svc_intf_errors.append(str(e))
+                    self.assert_equal(svc_intf_errors, re.search(r'\s', str(intf['ip_vlan'])), None, "-svc_intf.intf.{}.ip_vlan '{}' should not have any whitespaces in it".format(homed, intf['ip_vlan']))
+
                     if ',' in str(intf['ip_vlan']):
-                        list_ip_vlan = intf['ip_vlan'].split(',')
-                        for vlan in list_ip_vlan:
-                            try:
-                                int(vlan)
-                                svcinft_vlan(intf['switch'], int(vlan))
-                            except:
-                                svc_intf_errors.append("-svc_intf.intf.{}.ip_vlan VLAN '{}' should be an integrer numerical value".format(homed, vlan))
+                        list_intf_vlans = []
+                        for vlan in str(intf['ip_vlan']).split(','):
+                            # Ensures that each single VLAN (not ranges) is an integer before getting list of all vlans to check for duplicates
+                            if '-' not in vlan:
+                                try:
+                                    int(vlan)
+                                    svcinft_vlan(intf['switch'], int(vlan))
+                                    list_intf_vlans.append(int(vlan))
+                                except:
+                                    svc_intf_errors.append("-svc_intf.intf.{}.ip_vlan VLAN '{}' should be an integrer numerical value".format(homed, vlan))
+                            # Check first and last VLAN in range are integers before getting list of all vlans to check for duplicates
+                            if '-' in vlan:
+                                try:
+                                    int(vlan.split('-')[0])
+                                    int(vlan.split('-')[1])
+                                    for vl in range(int(vlan.split('-')[0]), int(vlan.split('-')[1]) +1):
+                                        svcinft_vlan(intf['switch'], int(vl))
+                                        list_intf_vlans.append(vl)
+                                except:
+                                    svc_intf_errors.append("-svc_intf.intf.{}.ip_vlan VLAN '{}' should be an integrer numerical value".format(homed, vlan))
+                        # DUPLICATE VLANS: Ensures that are no duplicate VLANs in the allowed trunk vlan list
+                        self.assert_equal(svc_intf_errors, len(set(list_intf_vlans)), len(list_intf_vlans), "-svc_intf.intf.{}.ip_vlan trunk contains duplicate VLANs {}".format(homed, list_intf_vlans))
+                    # Ensures single VLANs are integers
                     else:
-                        svcinft_vlan(intf['switch'], intf['ip_vlan'])
+                        self.assert_integrer(svc_intf_errors, intf['ip_vlan'], "-svc_intf.intf.{}.ip_vlan VLAN '{}' should be an integrer numerical value".format(homed, intf['ip_vlan']))
+                        svcinft_vlan(intf['switch'], intf.get('ip_vlan'))
 
                 # Gets number of Interfaces per device and any static interface/PO given
                 if homed == 'single_homed':

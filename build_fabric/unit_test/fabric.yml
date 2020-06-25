@@ -9,9 +9,9 @@
 # How big the network is, so the number of each switch. border/leaf must be in increments of 2 as in MLAG pair
 fbc:
   network_size:
-    num_spines: 5                             # Can be 1 to 4
-    num_borders: 1                            # Can be 0, 2 or 4
-    num_leafs: "2"                              # Can be 2, 4, 6, 8 or 10
+    num_spine: 5                             # Can be 1 to 4
+    num_border: 1                            # Can be 0, 2 or 4
+    num_leaf: "2"                              # Can be 2, 4, 6, 8 or 10
 
 # Number of interfaces on the device (first and last interface). Is needed to make interfaces declerative and default all interfaces not used
   num_intf:

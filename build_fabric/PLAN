@@ -1,16 +1,41 @@
+I change ec_fmt in fabric.yml from Port-channel to port-channel, need to keep inmind incase thigns start failing
 
-4. do post validation
-Change validation so seperate template per svc that are joined
+Can run in full but gets a bit noisy so easier to run in sections:
 
-5, Update tags, have now added bse_fbc_svc and svc
+1. Validate that you input files are correct as point attempting to run unless pre_val checks pass
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag pre_val
 
+2. Run in checkmode with output printed to screen to see what changes will be made:
+ansible-playbook playbook.yml -i inv_from_vars_cfg.yml --tag "dir, bse_fbc_svc, cfg_diff" -C
 
+3. If happy with run again to commit chnages. No need to recreate directories and depending number of changes may not want to print chnages ot screen, they can be viewed in xxxx
 
+NEED TO REWORD THIS INTO COMMON AND NOT SO COMMON as too complictaed
 
+--pre_val          Checks var_file contents are valid and conform to script rules (network_size, address format, etc)
+--dir                  Deletes and recreates the file struture to save configs, diffs and reports
 
+--bse                 Generates the base configuration snippet
+--fbc                  Generates the fabric config snippet and validation file
+--tnt                  Generates the tenants config snippet and validation file
+--intf                  Generates the interface config snippet and validation file
+--cln                  Generates config snippet to reset none used interfaces
 
+--bse_fbc          Generates and joins base, fabric and inft cleanup config snippets and creates validation file
+--bse_fbc_svc     Generates and joins base, fabric, all services and inft cleanup config snippets and creates validation file
 
+--cfg                  Apply the configuration to devices (diffs are saved to file)
+--cfg_diff          Apply the config and print the differences to screen (also still saved to file)
+--rb                    Reverses the changes by applying the rollback configuration
+--rb_diff               Reverses the changes by applying the rollback configuration and prints the diffs to screen
 
+--nap_val         Run napalm-validation with whatever validatiion files have been created via other tags --cus_val Run custom-validation with whatever validatiion files have been created via other tags
+
+--nap_val_all           Generates validation file for all roles and runs generic napalm_validate to check LLDP, BGP and ping
+--cus_val_all           Generates validation file for all roles and runs device type specific custom_validate to check OSPF, LAG and MLAG
+--post_val         Runs nap_val and cus_val
+
+--full                  Runs everything except cfg_diff
 
 Nice to have
 1.  Add playbook for netbox
@@ -18,35 +43,3 @@ Nice to have
 https://overlaid.net/2019/02/19/arista-bgp-evpn-ansible-lab/
 https://github.com/varnumd/ansible-arista-evpn-lab
 
-
-ADD to notes on filters:
-You can use facts (got from filters) in other as long as they are run before you try and reference it
-
-Add to notes, not sure where:
-    - debug:
-        msg: "{{ ansible_play_hosts_all }}"             see all hosts play is run on, lots more here https://docs.ansible.com/ansible/latest/reference_appendices/special_variables.html
-
-
-DO nexus notes
-
-add this to my dict notes to append to dict value ratehr than over righting it
-
-In [93]: from collections import defaultdict
-
-In [94]: b = defaultdict(list)
-
-In [95]: for x in a:
-    ...:     b[x['switch']].append(x['ip_vlan'])
-
-
-to combine 2 dicts with same values:
-        dd = {defaultdict(list)}
-
-        for d in (sh_per_dev_intf, dh_per_dev_intf):
-            for key, value in d.items():
-                dd[key].extend(value)
-        return dd
-
-to merge 2 dics with diff vlaues
-This is generally considered a trick in Python where a single expression is used to merge two dictionaries and stored in a third dictionary. The single expression is **. This does not affect the other two dictionaries. ** implies that the argument is a dictionary. Using ** [double star] is a shortcut that allows you to pass multiple arguments to a function directly using a dictionary. For more information refer **kwargs in Python. Using this we first pass all the elements of the first dictionary into the third one and then pass the second dictionary into the third. This will replace the duplicate keys of the first dictionary.
-z = {**dict1, **dict2}
