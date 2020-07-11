@@ -1,44 +1,51 @@
 # Deploy Leaf and Spine
+This playbook will deploy a leaf and spine fabric and its related services in a declarative manner. You only have to define a few key values such as *naming convention*, *number of devices* and *addresses ranges*, the playbook will do the rest. It is structured into the following 5 roles giving you the option to deploy part or all of the fabric using the playbook
 
-This playbook will deploy a leaf and spine fabric and its related services in a declarative manner. You only have to define a few key values such as *naming convention*, *number of devices* and *addresses ranges*, the playbook will do the rest.
-If you wish to have a more custom build the majority of the elements (unless specifically stated) in the variable files can be changed as none of the scripting or templating logic uses the actual contents to make decisions.
+- base: None fabric specific core configuration such as hostname, address ranges, users, acls, ntp, etc 
+- fabric: Fabric specific elements such as fabric size, interfaces, OSPF, BGP and MLAG
+- services: Services provided by the fabric split into three sub-roles:
+    - tenant: VRFs, SVIs and VLANs on the fabric and their associated VNIs 
+    - interface: Access ports connecting to compute or other non-fabric network devices
+    - routing: BGP (address-families), OSPF (additional non-fabric process) and static routes
 
-This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, ideally these ranges would not be changed but can be done so within *fabric.yml* (*fbc.adv.bse_intf*).
+If you wish to have a more custom build the majority of the elements in the variable files (unless specifically stated) can be changed as none of the scripting or templating logic uses the actual contents to make decisions.
 
-- SPINE-to-LEAF:           *Eth1/1 - 1/10*
-- SPINE-to-BORDER:     *Eth1/11 - 1/14*
-- LEAF-to-SPINE:           *Eth1/1 - 1/4*
-- BORDER-to-SPINE:     *Eth1/1 - 1/4*
-- MLAG Peer-link:          *Eth1/11 - 12*
+This deployment will only scale upto 4 spines, 4 borders and 10 leafs. By default the following ports are used for inter-switch links, these can be changed within *fabric.yml* (*fbc.adv.bse_intf*).
+
+- SPINE-to-LEAF:                *Eth1/1 - 1/10*
+- SPINE-to-BORDER:         *Eth1/11 - 1/14*
+- LEAF-to-SPINE:                *Eth1/49 - 1/52*
+- BORDER-to-SPINE:         *Eth1/49 - 1/52*
+- MLAG Peer-link:               *Eth1/53 - 54*
 
 ![image](https://user-images.githubusercontent.com/33333983/83332342-9b246500-a292-11ea-9455-7cbe56e0d701.png)
 
-This whole playbook is based on using the one module for all the connections. I have not tested how it will work with multiple modules, the role *intf_cleanup* will likely not work. This role ensures interface configuration is decelerative by defaulting non-used interfaces, therefore could be excluded without breakign the playbook.
+This playbook is based on using the one module for all the connections. I have not tested how it will work with multiple modules, the role *intf_cleanup* will likely not work. This role ensures interface configuration is declarative by defaulting non-used interfaces, therefore could be excluded without breaking the playbook.
 
-As Python is a lot more flexible than Ansible the dynamic inventory and custom filter plugins (within the roles) do the manipulating of the datA in the variable files to create the data models that are used by the templates. This helps to abstract a lot of the complexity out of the jinja templates making it easier to create new templates for different vendors as just you only have to worry about the device configuration rather than data manipulation.
+As Python is a lot more flexible than Ansible the dynamic inventory and custom filter plugins (within the roles) do the manipulating of the data in the variable files to create the data models that are used by the templates. This helps to abstract a lot of the complexity out of the jinja templates making it easier to create new templates for different vendors as you only have to deal with the device configuration rather than data manipulation.
 
 ## Dynamic Inventory
 
 A custom inventory plugin is used to create the dynamic inventory and *host_vars* of all the interfaces and IP addresses needed for the fabric. By doing this in the inventory it abstracts the complexity from the *base* and *fabric* templates keeping them clean and simple which makes it easier to expand this playbook build templates for other brands.
 
-```bash
+```sh
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --host=DC1-N9K-SPINE01     Host attributes
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --graph                    Groups and members
 ansible-inventory --playbook-dir=$(pwd) -i inv_from_vars_cfg.yml --list                     All devices and host_vars
 ansible-playbook playbook.yml -i inv_from_vars_cfg.yml                                      Run against a playbook
 ```
 
-With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all the following host_vars are created for every host. 
-- ansible_host:                 *string*
-- ansible_network_os:     *string*
-- num_intf:                        *Number of the first and last interface on the switch*
-- intf_fbc:                          *Dictionary with interface the keys and description the values*
-- intf_lp:                            *List of dictionaries with the keys name, ip and descr*
-- intf_mlag:                       *Dictionary with interface the keys and description the values*
-- mlag_peer_ip:                *string in the format x.x.x.x*
+With the exception of *intf_mlag* and *mlag_peer_ip* (not on spines) all of the following *host_vars* are created for every host. 
+- ansible_host:                       *string*
+- ansible_network_os:         *string*
+- num_intf:                             *Number of the first and last interface on the switch*
+- intf_fbc:                               *Dictionary with interface the keys and description the values*
+- intf_lp:                                 *List of dictionaries with the keys name, ip and descr*
+- intf_mlag:                           *Dictionary with interface the keys and description the values*
+- mlag_peer_ip:                   *string in the format x.x.x.x*
 
 An example of the host_vars for a leaf switch:
-```bash
+```json
 {
     "ansible_host": "10.10.108.21",
     "ansible_network_os": "nxos",
@@ -78,43 +85,42 @@ These core elements are the minimum requirements to create the declarative fabri
 *creds_all:* hostname, username and password
 
 **base.yml** *(bse)*\
-*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and group name created from (in lowercase). The group name is created from characters after the last hyphen, so for 'DC1-N9K-SPINE' the group name would be 'spine'. The only limitation on the name is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore. This is a limitaiton of Ansible as these are the only characters that Ansible accepts for group names.
+*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and group name created from (in lowercase). The Ansible group name is created from characters after the last hyphen. The only limitation on the naming is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore. This is a limitaiton of Ansible as these are the only characters that Ansible accepts for group names.
 
-- spine: xx-xx
-- border: xx-xx
-- leaf: xx-xx
+| variable       | value | description                                                                   |
+|----------------|----------|-------------------------------------------------------------------------------|
+| spine          | xx-xx    | Name of the spine switch. For example with DC1-N9K-SPINE01 the group would be *'spine'*   |
+| border         | xx-xx    | Name of the border switch. Using DC1-N9K-BORDER01 the group would be *'border'*        |
+| leaf           | xx-xx    | Name of the leaf switch. Using DC1-N9K-LEAF01 the group would be *'leaf'*          |
 
 *addr:* The subnets from which the device specific IP addresses are generated. The addresses assigned are based on the *device role increment* and the *node number*. These must have the mask in prefix format (/x).
 
-- lp_net: x.x.x.x/32                   *Core OSPF and BGP peerings. By default will use .11 to .59*
-- mgmt_net: x.x.x.x/27            *Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
-- mlag_net: x.x.x.x/28               *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
-- srv_ospf_net: x.x.x.x/28        *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
+| variable       | value | description                                                                   |
+|----------------|-------|-------------------------------------------------------------------------------|
+| lp_net | x.x.x.x/32 | *Core OSPF and BGP peerings. By default will use .11 to .59*
+| mgmt_net | x.x.x.x/27 | *Management network. Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
+| mlag_net | x.x.x.x/28 | *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
+| srv_ospf_net | x.x.x.x/28 | *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
 
 **fabric.yml** *(fbc)*\
 *network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine and 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
 
-- num_spines: x                        *Can have a maximum of 4*
-- num_borders: x                      *Can have a maximum of 4*
-- num_leafs: x                           *Can have a maximum of 10*
+| variable       | value | description                                                                   |
+|----------------|----------|-------------------------------------------------------------------------------|
+| num_spines | 2 | *Number of spine switches, can have a maximum of 4*
+| num_borders | 2 | *Number of border switches, can have a maximum of 4*
+| num_leafs | 4 | *Number of leaf switches, can have a maximum of 10*
 
-*num_intf:* Defines the number of interfaces on the device by specifiying the first and last interface. This required to make interfaces decelerative so that if you change an interface the old interface is reset to the default settings.
-- spine: 1,128                          *First and last spine device interface*
-- border: 1,128                        *First and last border device interface*
-- leaf: 1,128                             *First and last leaf device interface*
+*num_intf:* Defines the total number of interfaces on the device type by specifying the first and last interface. This required to make interfaces declarative so that if you change an interface the old interface is reset to the default settings.
+
+| variable       | value | description                                                                   |
+|----------------|----------|-------------------------------------------------------------------------------|
+| spine | 1,128 | *The first and last interface for a spine switch*
+| border | 1,128 | *The first and last interface for a border switch*
+| leaf | 1,128 | *The first and last interface for a leaf switch*
 
 *address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
-- spine_ip: 11                        *Spine mgmt IP and routing loopback addresses will be from .11 to .14*
-- border_ip: 16                      *Border mgmt IP and routing loopback addresses will be from .16 to .19*
-- leaf_ip: 21                           *Leaf mgmt IP and routing loopback addresses will be from .21 to .30*
-- border_vtep_lp: 36            *Border VTEP loopback addresses will be from .36 to .39*
-- leaf_vtep_lp: 41                  *Leaf VTEP loopback addresses will be from .41 to .50*
-- border_mlag_lp: 56          *Pair of border shared loopback addresses (VIP) will be from .56 to .57*
-- leaf_mlag_lp: 51                *Pair of leaf MLAG shared loopback addresses (VIP) will be from .51 to .55*
-- border_bgw_lp: 58             *Pair of border  BGW shared anycast loopback addresses will be from .58 to .59*
-- mlag_leaf_ip: 0                 *Start IP for Leaf Peer Links, so LEAF1 is .0, LEAF2 is .1, LEAF3 is .2, etc*
-- mlag_border_ip: 10            *Start IP for border  Peer Links, so BORDER1 is .10, BORDER2 is .11, etc*
 
 | variable       | Value | Description                                                                   |
 |----------------|-------|-------------------------------------------------------------------------------|
