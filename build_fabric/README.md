@@ -80,49 +80,48 @@ An example of the host_vars for a leaf switch:
 
 These core elements are the minimum requirements to create the declarative fabric. They are used for the dynamic inventory creation as well by the majority of the Jinja2 templates. All variables are preceeded by *ans*, *bse* or *fbc* to make it easier to identify within the playbook, roles and templates which variable file the variable came from.
 
-**ansible.yml** *(ans)*\
-*device_type:* Operating system of each device type (spine, leaf and border)\
-*creds_all:* hostname, username and password
+##### ansible.yml *(ans)*
+***device_type:*** Operating system of each device type (spine, leaf and border)\
+***creds_all:*** hostname, username and password
 
-**base.yml** *(bse)*\
-*device_name:* The naming format that the automatically generated node ID is added to (double decimal format) and group name created from (in lowercase). The Ansible group name is created from characters after the last hyphen. The only limitation on the naming is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore. This is a limitaiton of Ansible as these are the only characters that Ansible accepts for group names.
+##### base.yml *(bse)*
+***device_name:*** The naming format that the automatically generated node ID is added to (double decimal format) and group name created from (in lowercase). The Ansible group name is created from characters after the last hyphen. The only limitation on the naming is that it must contain a hyphen and the characters after that hyphen must be either letters, digits or underscore. This is a limitaiton of Ansible as these are the only characters that Ansible accepts for group names.
 
-| variable       | value | description                                                                   |
+| Key      | Value | Information                                                             |
 |----------------|----------|-------------------------------------------------------------------------------|
 | spine          | xx-xx    | Name of the spine switch. For example with DC1-N9K-SPINE01 the group would be *'spine'*   |
 | border         | xx-xx    | Name of the border switch. Using DC1-N9K-BORDER01 the group would be *'border'*        |
 | leaf           | xx-xx    | Name of the leaf switch. Using DC1-N9K-LEAF01 the group would be *'leaf'*          |
 
-*addr:* The subnets from which the device specific IP addresses are generated. The addresses assigned are based on the *device role increment* and the *node number*. These must have the mask in prefix format (/x).
+***addr:*** The subnets from which the device specific IP addresses are generated. The addresses assigned are based on the *device role increment* and the *node number*. These must have the mask in prefix format (/x).
 
-| variable       | value | description                                                                   |
+| Key      | Value | Information                                                                    |
 |----------------|-------|-------------------------------------------------------------------------------|
 | lp_net | x.x.x.x/32 | *Core OSPF and BGP peerings. By default will use .11 to .59*
 | mgmt_net | x.x.x.x/27 | *Management network. Needs to be at least /27 to cover the maximum spine (4), leaf (10) and border (4)*
 | mlag_net | x.x.x.x/28 | *MLAG peer-link addresses. At least /28 to cover the maximum leaf (10) and border (4)*
 | srv_ospf_net | x.x.x.x/28 | *Non-core OSPF process peerings between the borders (4 IPs per-OSPF process)*
 
-**fabric.yml** *(fbc)*\
-*network_size:* How big the network is, so the number of each switch type. At a minimum must have 1 spine and 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
+##### fabric.yml *(fbc)*
+***network_size:*** How big the network is, so the number of each switch type. At a minimum must have 1 spine and 2 leafs. The border and leaf switches must be in increments of 2 as are an MLAG pair.
 
-| variable       | value | description                                                                   |
+| Key      | Value | Information                                                                   |
 |----------------|----------|-------------------------------------------------------------------------------|
 | num_spines | 2 | *Number of spine switches, can have a maximum of 4*
 | num_borders | 2 | *Number of border switches, can have a maximum of 4*
 | num_leafs | 4 | *Number of leaf switches, can have a maximum of 10*
 
-*num_intf:* Defines the total number of interfaces on the device type by specifying the first and last interface. This required to make interfaces declarative so that if you change an interface the old interface is reset to the default settings.
+***num_intf:*** Defines the total number of interfaces on the device type by specifying the first and last interface. This required to make interfaces declarative so that if you change an interface the old interface is reset to the default settings.
 
-| variable       | value | description                                                                   |
+| Key      | Value | Information                                                                    |
 |----------------|----------|-------------------------------------------------------------------------------|
 | spine | 1,128 | *The first and last interface for a spine switch*
 | border | 1,128 | *The first and last interface for a border switch*
 | leaf | 1,128 | *The first and last interface for a leaf switch*
 
-*address_incre:* Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
+***address_incre:*** Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
-
-| variable       | Value | Description                                                                   |
+| Key      | Value | Information                                                                    |
 |----------------|-------|-------------------------------------------------------------------------------|
 | spine_ip       | 11    | Spine mgmt IP and routing loopback addresses will be from .11 to .14          |
 | border_ip      | 16    | Border mgmt IP and routing loopback addresses will be from .16 to .19         |
