@@ -119,7 +119,22 @@ These core elements are the minimum requirements to create the declarative fabri
 | border | 1,128 | *The first and last interface for a border switch*
 | leaf | 1,128 | *The first and last interface for a leaf switch*
 
-***address_incre:*** Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
+***adv.bse_intf:*** Interface naming formats and the seed interface numbers used to define the interfaces that build the fabric.
+
+| Key      | Value | Information                                                                    |
+|----------------|-------|-------------------------------------------------------------------------------|
+| intf_fmt | Ethernet1/ | *Switch interface naming format*
+| intf_short | Eth1/ | *Used in descriptions of interfaces*
+| ec_fmt | port-channel | *LAG interface naming format*
+| ec_short | Po | *Used in descriptions of LAG interfaces*
+| lp_fmt: loopback | *Loopback interface naming format*
+| sp_to_lf | 1  | *First interface used for SPINE to LEAF links (1 to 10)*
+| sp_to_bdr | 11 | *First interface used for SPINE to BORDER links (11 to 14)*
+| lf_to_sp | 49 | *First interface used LEAF to SPINE links (49 to 52)*
+| bdr_to_sp | 49 | *First interface used BORDER to SPINE links (49 to 52)*
+| mlag_peer | 53-54 | * Interfaces used for the MLAG peer Link (will be in the MLAG LAG)*
+
+***adv.address_incre:*** Increment that is added to the subnet and device hostname node ID to generate the unique IP addresses. Different increments are used dependant on the device role to keep the addressing unique.
 
 | Key      | Value | Information                                                                    |
 |----------------|-------|-------------------------------------------------------------------------------|
@@ -164,11 +179,7 @@ These settings can be specified with the same VLANs list by adding these additio
 | create_on_leaf | `True` or `False` |*Dictates whether this VLAN is created on the leafs (default True)*
 | create_on_border | `True` or `False` | *Dictates whether this VLAN is created on the borders (default False)*
     
-If the tenant is a L3 tenant the route-map for redistribution is always created and attached to the BGP peer. By default *ipv4_bgp_redist* is set to *True* meaning that the route-map will be empty (*permit all*). The name of this redistribution route_map can be changed as long as it stills contain 'src' and 'dst' as they are replaced with 'CONN' and 'BGPxx_VRF' by the filter_plugin. Route-map and prefix-list names should be defined within the *service_interface.yml* variable file. If the redistribute route-map is not defined in that file it will fallback to using the value specified within this *services-tenant.yml* variable file (under *svc_tnt.adv.redist*). The name in the *service_interface.yml* file will always takes precedence.
-
-| Key      | Value | Information                                                                    |
-|----------------|-------|------------------------------------------------------------------------------|
-| rm_name | RM_src_to_dst | *The name can be anything, however it must contain src and dst*
+If the tenant is a L3 tenant the route-map for redistribution is always created and attached to the BGP peer. By default *ipv4_bgp_redist* is set to *True* meaning that the route-map will be empty (*permit all*). The name of this redistribution route_map can be changed in the advanced (adv) section of this or the *services-tenant.yml* variable file. The rm_name setting in the *service_interface.yml* file will always takes precedence.
 
 ### L2VNI and L3VNI numbers
 The *services_tenant* variables are passed through a filter_plugin (*format_dm.py*) which creates a per device_role (border or leaf) data-model that includes the L2VNI and L3VNI numbers. These values are derived from base settings which are incremented on a per-tenant basis.  
