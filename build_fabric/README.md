@@ -127,7 +127,7 @@ These core elements are the minimum requirements to create the declarative fabri
 | intf_short | Eth1/ | *Used in descriptions of interfaces*
 | ec_fmt | port-channel | *LAG interface naming format*
 | ec_short | Po | *Used in descriptions of LAG interfaces*
-| lp_fmt: loopback | *Loopback interface naming format*
+| lp_fmt | loopback | *Loopback interface naming format*
 | sp_to_lf | 1  | *First interface used for SPINE to LEAF links (1 to 10)*
 | sp_to_bdr | 11 | *First interface used for SPINE to BORDER links (11 to 14)*
 | lf_to_sp | 49 | *First interface used LEAF to SPINE links (49 to 52)*
@@ -201,7 +201,7 @@ These starting values and increments can be changed in the advanced section (*sv
 | l3vni | 1 | *Value by which the transit L3VNI VNI number is increased for each tenant*
 | l2vni | 10000 | *Value by which the L2VNI range (range + vlan) is increased for each tenant*
 
-An example of a data model created by the *format_dm.py* custom filter plugin. These are created on a device_role basis, so for all leaf switches and for all border switches.
+An example of a data model created by the *svc_tnt_dm* method within the *format_dm.py* custom filter plugin. These are created on a device_role basis, so for all leaf switches and for all border switches.
 ```json
 {
     "bgp_redist_tag": 3001,
