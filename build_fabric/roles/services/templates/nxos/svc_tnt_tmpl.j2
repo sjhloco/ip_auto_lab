@@ -72,7 +72,7 @@ evpn
 
 {#### BGP_REDIST: Only applies if it is a L3_tenant. RM always created and applied, however the match statement is dependant on ipv4_bgp_redist ####}
 {% for flt_tnt in flt_vars %}{% if flt_tnt.l3_tnt is sameas true %}
-route-map {{ svc_tnt.adv.bgp.ipv4_redist_rm_name |replace("vrf", flt_tnt.tnt_name) |replace("as", fbc.route.bgp.as_num) }} permit 10
+route-map {{ flt_tnt.rm_name }} permit 10
 {% if flt_tnt.tnt_redist is sameas true %}
   match tag {{ flt_tnt.bgp_redist_tag }}
 {% endif %}
@@ -83,5 +83,5 @@ router bgp 65001
   vrf {{ flt_tnt.tnt_name }}
     address-family ipv4 unicast
       advertise l2vpn evpn
-      redistribute direct route-map {{ svc_tnt.adv.bgp.ipv4_redist_rm_name |replace("vrf", flt_tnt.tnt_name) |replace("as", fbc.route.bgp.as_num) }}
+      redistribute direct route-map {{ flt_tnt.rm_name }}
 {% endif %}{% endfor %}

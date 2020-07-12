@@ -43,21 +43,4 @@ interface {{ intf.intf_num }}
   channel-group {{ intf.po_num }} force mode {{ intf.po_mode }}
 {% endif %}{% endif %}{% endif %}
   no shutdown
-
 {% endfor %}
-
-{# {% if port.ospf is defined and device_name.border_name in port.switch %}
-  ip ospf hello-interval {{ port.ospf[1] }}
-  no ip ospf passive-interface
-{% for vrf in srv_routing %}{% if vrf.ospf != none %}{% for ospf in vrf.ospf %}
-{% if port.ospf[0] == ospf.pro %}
-{% if inventory_hostname[-2:] == '01' or inventory_hostname[-2:] == '02' %}
-  ip router ospf {{ port.ospf[0] }} area {{ ospf.area }}
-{% elif inventory_hostname[-2:] == '03' or inventory_hostname[-2:] == '04' %}
-  ip router ospf {{ port.ospf[0] }} area {{ ospf.area[:-1] + (ospf.area[-1:] |int+1) |string }}
-{% endif %}{% endif %}
-{% endfor %}{% endif %}{% endfor %}
-{% endif %}{% endif %}
-  no shutdown
-!
-{% endif %}{% endfor %} #}

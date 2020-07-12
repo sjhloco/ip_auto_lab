@@ -2,7 +2,8 @@
 # This playbook is used to to deploy leaf and spine topology
 
 - name: "Deploy Leaf and Spine DC"
-  hosts: all
+  # hosts: all
+  hosts: DC1-N9K-LEAF01:DC1-N9K-LEAF04
   # hosts: DC1-N9K-BORDER02
   # hosts: DC1-N9K-LEAF01:DC1-N9K-LEAF02
   # hosts: DC1-N9K-SPINE02
@@ -11,13 +12,14 @@
     - vars/ansible.yml            # All variables start with ans.
     - vars/base.yml               # All variables start with bse.
     - vars/fabric.yml             # All variables start with fbc.
-    - vars/services_tenant.yml    # All variables start with svc_tnt
-    - vars/services_interface.yml    # All variables start with svc_tnt
+    - vars/service_tenant.yml    # All variables start with svc_tnt
+    - vars/service_interface.yml    # All variables start with svc_intf
+    - vars/service_routing.yml    # All variables start with svc_rtr
     # Used to test pre_validation checls
     # - unit_test/base.yml
     # - unit_test/fabric.yml
-    # - unit_test/services_tenant.yml
-    # - unit_test/services_interface.yml
+    # - unit_test/service_tenant.yml
+    # - unit_test/service_interface.yml
 
 ######################## 1. Validates the input data (in var_files) and creates the file strucuture ########################
   pre_tasks:
@@ -93,6 +95,14 @@
         name: services
         tasks_from: svc_intf
       tags: [intf, svc, bse_fbc_svc, full]
+
+    - name: Builds the tenant routing config snippets
+      import_role:
+        name: services
+        tasks_from: svc_rtr
+      # tags: test
+      tags: [rtr, svc, bse_fbc_svc, full]
+
 
     - name: Interface cleanup
       import_role:

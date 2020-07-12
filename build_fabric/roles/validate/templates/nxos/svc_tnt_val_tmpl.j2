@@ -9,12 +9,8 @@
 {% set flt_vars = flt_svc_tnt[1] %}{% set stp_fwd_vlans = flt_svc_tnt[3] %}
 {% endif %}
 
-
 {# Adds the results of this rendered file into the bse_fbc_val_tmpl file #}
 {% extends ansible_network_os + "/bse_fbc_val_tmpl.j2" %}
-
-
-
 
 
 {### show port-channel summary ###}

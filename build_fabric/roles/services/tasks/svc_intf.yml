@@ -1,17 +1,20 @@
 ---
-### Uses template to build the tenant configuration, so VRFs, SVIs, VXLANs and VLANs using variables from services_tenant.yml) ###
-- name: "Getting interface list"
+### Uses template to build the interface configuration, so defines the port type (L3, trunk, access, etc) and port-channel membership from service_intefrace.yml) ###
+
+- name: "Create the interface configuration snippets"
   block:
     - name: "SYS >> Creating per-device service_interface data-models"
       set_fact:
         flt_svc_intf: "{{ svc_intf.intf |create_svc_intf_dm(inventory_hostname, svc_intf.adv, fbc.adv.bse_intf) }}"
-      changed_when: False           # Stops it reporting changes in playbook summary
-  check_mode: False             # These tasks still make changes when in check mode
+#       changed_when: False           # Stops it reporting changes in playbook summary
+#   check_mode: False                 # These tasks still make changes when in check mode
 
-- name: "SYS >> Generating service_tenant config snippets"
-  template:
-    src: "svc_intf_tmpl.j2"
-    dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/svc_intf.conf"
-  changed_when: False           # Stops it reporting changes in playbook summary
-  check_mode: False             # These tasks still make changes when in check mode
-  when: bse.device_name.spine not in inventory_hostname
+# - name: "SYS >> Generating service_interface config snippets"
+#   template:
+#     src: "{{ ansible_network_os }}/svc_intf_tmpl.j2"
+#     dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/svc_intf.conf"
+#   changed_when: False           # Stops it reporting changes in playbook summary
+#   check_mode: False             # These tasks still make changes when in check mode
+#   when: bse.device_name.spine not in inventory_hostname
+    - debug:
+        var=flt_svc_intf

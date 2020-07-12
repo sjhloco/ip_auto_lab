@@ -11,7 +11,7 @@ fbc:
   network_size:
     num_spine: 2                             # Can be 1 to 4
     num_border: 2                            # Can be 0, 2 or 4
-    num_leaf: 2                              # Can be 2, 4, 6, 8 or 10
+    num_leaf: 4                              # Can be 2, 4, 6, 8 or 10
 
 # Number of interfaces on the device (first and last interface). Is needed to make interfaces declerative and default all interfaces not used
   num_intf:

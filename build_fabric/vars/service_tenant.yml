@@ -102,5 +102,6 @@ svc_tnt:
       l3vni: 1                # Value by which to increase transit L3VNI VNI number for each tenant
       l2vni: 10000            # Value by which to increase the L2VNI range used (range + vlan) for each tenant
 
-    bgp:
-      ipv4_redist_rm_name: rm_CONN_vrf>>BGPas     # Can change route-map name, but it MUST still include 'vrf' and 'as' in the text
+# service_routing.yml (svc_rtr.adv.redist) takes precedence, this is only used if it is not defined in service_routing.yml
+    redist:
+      rm_name: RM_src_to_dst     # Name can be anythign but must include src and dst as they are replaced with 'CONN' and 'BGPxx_VRF'

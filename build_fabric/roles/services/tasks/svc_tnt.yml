@@ -1,20 +1,20 @@
 ---
-### Uses template to build the tenant configuration, so VRFs, SVIs, VXLANs and VLANs using variables from services_tenant.yml) ###
+### Uses template to build the tenant configuration, so VRFs, SVIs, VXLANs and VLANs using variables from service_tenant.yml) ###
 
 - name: "Create the tenant configuration snippets"
   block:
-  - name: "SYS >> Creating per-device-role service_tenant data-models"
-    set_fact:
-      flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre, fbc.adv.mlag.peer_vlan) }}"   # Completes data-model with VNI
-    changed_when: False           # Stops it reporting changes in playbook summary
+    - name: "SYS >> Creating per-device-role service_tenant data-models"
+      set_fact:
+        flt_svc_tnt: "{{ svc_tnt.tnt |create_svc_tnt_dm(svc_tnt.adv.bse_vni, svc_tnt.adv.vni_incre, fbc.adv.mlag.peer_vlan,
+                         svc_rtr.adv.redist.rm_name |default(svc_tnt.adv.redist.rm_name), fbc.route.bgp.as_num) }}"   # Completes data-model with VNI
+      changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False             # These tasks still make changes when in check mode
-  run_once: true                # Only has to run once to create the new data-models
+  run_once: true                # Only has to run once to create the new data-models as is not per-device
 
 - name: "SYS >> Generating service_tenant config snippets"
   template:
-    src: "svc_tnt_tmpl.j2"
+    src: "{{ ansible_network_os }}/svc_tnt_tmpl.j2"
     dest: "{{ ans.dir_path }}/{{ inventory_hostname }}/config/svc_tnt.conf"
   changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False             # These tasks still make changes when in check mode
   when: bse.device_name.spine not in inventory_hostname
-
