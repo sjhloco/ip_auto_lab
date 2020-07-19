@@ -9,7 +9,7 @@ class FilterModule(object):
         }
 
 
-###################################### TNT DATA MODEL: Uses input from service_tenant.yml ######################################
+###################################### TNT DATA-MODEL: Uses input from service_tenant.yml ######################################
 # Creates 2 new seperate Data Models for Leaf and Border devices with only the tenants and vlans on those device roles and incorporating the VNIs
 
     def svc_tnt_dm(self, srv_tnt, bse_vni, vni_incre, vpc_peer_vlan, rm_name_tmp, as_num):
@@ -87,8 +87,8 @@ class FilterModule(object):
         return [leaf_tnt, border_tnt, self.vlan_seq(lf_vlan_numb), self.vlan_seq(bdr_vlan_numb)]
 
 
-###################################### INTF DATA MODEL: Uses input from service_interface.yml ######################################
-# Creates a per-device data model of all interfaces to be configured on that device
+
+################################################## DRY Functions used by INTF DATA-MODEL ##################################################
 
     #VLAN SEQ: Method used by main ' svc_intf_dm' method to change sequental vlans so that they are separated by '-' as per the "trunk allowed vlans" config syntax
     def vlan_seq(self, vlans):
@@ -123,14 +123,17 @@ class FilterModule(object):
         # Return it as one big string
         return ','.join([str(elem) for elem in vlan_seq])
 
+###################################### INTF DATA-MODEL: Uses input from service_interface.yml ######################################
+# Creates a per-device data model of all interfaces to be configured on that device
 
-    # Main function to create the data models
     def svc_intf_dm(self, all_homed, hostname, intf_adv, bse_intf):
         sl_hmd = intf_adv['single_homed']
         dl_hmd = intf_adv['dual_homed']
         intf_fmt = bse_intf['intf_fmt']
+        lp_fmt = bse_intf['lp_fmt']
         ec_fmt = bse_intf['ec_fmt']
-        all_intf, have_intf, sl_need_intf, dl_need_intf, all_intf_num, sl_range, dl_range, need_po, all_po_num, po_range = ([] for i in range(10))
+        tmp_all_intf, have_intf, sl_need_intf, dl_need_intf, all_intf_num, sl_range, dl_range, need_po, all_po_num, po_range = ([] for i in range(10))
+        all_lp_num, lp_need_intf, lp_range = ([] for i in range(3))
 
         # 1. DEFAULTS: Fill out default values and change the nested dict into a list
         for homed, interfaces in all_homed.items():
@@ -154,46 +157,71 @@ class FilterModule(object):
                     intf['stp'] = 'normal'
                 elif intf['type'] == 'non_stp_trunk':
                     intf['stp'] = 'edge'
-                all_intf.append(intf)
-
-        # 2. FILTER: Deletes interfaces not on this switch and separates the defined and non-defined ports for single and dual-homed
-        for intf in all_intf:
-
+                tmp_all_intf.append(intf)
+        a = []
+        # 2. FILTER:Creates new lists of all interfaces (all_intf_num, all_lp_num), intf with defined port (have_intf) and intf with non-defined ports (lp_need_intf, sl_need_intf, dh_need_intf)
+        for intf in tmp_all_intf:
+            # SH: Single-homed to be created if hostname is in the list of switches
             if intf['dual_homed'] == False and hostname in intf['switch']:
-                if intf['intf_num'] == None:
-                    sl_need_intf.append(intf)
+                # LP: Loopback interfaces to be created on this deivce
+                if intf['type'] == 'loopback':
+                    if intf['intf_num'] == None:
+                        lp_need_intf.append(intf)                                   # List of loopbacks that dont have a number
+                    elif intf['intf_num'] != None:
+                        all_lp_num.append(intf['intf_num'])                         # List of all used loopback numbers
+                        intf['intf_num'] = lp_fmt + str(intf['intf_num'])           # Adds the loopback name to the number
+                        have_intf.append(intf)                                      # List of loopbacks that have a number
+                # OTHER_SH: All other SH interfaces on this switch
                 else:
-                    all_intf_num.append(intf['intf_num'])                       # List of all used interface numbers
-                    intf['intf_num'] = intf_fmt + str(intf['intf_num'])         # Adds the interface name to the number
-                    have_intf.append(intf)
-            # Dual-homed interfaces need to be created on both MLAG pairs so logic matches both hostnames
-            elif intf['dual_homed'] == True and hostname in intf['switch'] or hostname[:-2] + "{:02d}".format(int(hostname[-2:]) -1) in intf['switch']:
-                if intf['intf_num'] == None:
-                    dl_need_intf.append(intf)
-                else:
-                    all_intf_num.append(intf['intf_num'])
-                    intf['intf_num'] = intf_fmt + str(intf['intf_num'])
-                    have_intf.append(intf)
-            del intf['switch']                  # Removes as no longer needed
+                    if intf['intf_num'] == None:
+                        sl_need_intf.append(intf)                                   # List of interfaces that need to be assigned an interface number
+                    else:
+                        all_intf_num.append(intf['intf_num'])                       # List of all used interface numbers
+                        intf['intf_num'] = intf_fmt + str(intf['intf_num'])         # Adds the interface name to the number
+                        have_intf.append(intf)                                      # List of interfaces that have an interface number
+            # DH: Dual-homed interfaces need to be created on both MLAG pairs so logic matches both hostnames
+            elif intf['dual_homed'] == True:
+                if hostname in intf['switch'] or hostname[:-2] + "{:02d}".format(int(hostname[-2:]) -1) in intf['switch']:
+                    if intf['intf_num'] == None:
+                        dl_need_intf.append(intf)
+                    else:
+                        all_intf_num.append(intf['intf_num'])
+                        intf['intf_num'] = intf_fmt + str(intf['intf_num'])
+                        have_intf.append(intf)
+            del intf['switch']                                                  # Removes as no longer needed
 
         # 3. INTF_RANGES: Adjust interface assignment ranges to remove any already used interfaces
-        for intf_num in range(dl_hmd['first_intf'], dl_hmd['last_intf'] + 1):
-            dl_range.append(intf_num)
-        dl_range = set(dl_range) - set(all_intf_num)
-        dl_range = list(dl_range)
-        dl_range.sort()
+        # Loopback
+        for intf_num in range(sl_hmd['first_lp'], sl_hmd['last_lp'] + 1):
+            lp_range.append(intf_num)
+        lp_range = set(lp_range) - set(all_lp_num)
+        lp_range = list(lp_range)
+        lp_range.sort()
+        # Single-homed
         for intf_num in range(sl_hmd['first_intf'], sl_hmd['last_intf'] + 1):
             sl_range.append(intf_num)
         sl_range = set(sl_range) - set(all_intf_num)
         sl_range = list(sl_range)
         sl_range.sort()
+       # Dual-homed
+        for intf_num in range(dl_hmd['first_intf'], dl_hmd['last_intf'] + 1):
+            dl_range.append(intf_num)
+        dl_range = set(dl_range) - set(all_intf_num)
+        dl_range = list(dl_range)
+        dl_range.sort()
 
-        # 4a. SINGLE-HOMED: Adds the interface number to existing DM
+        # 4. INTF_ASSIGN:  Assigns an interface number and adds that number to the existing interface DM
+        # Loopback
+        for intf, int_num in zip(lp_need_intf, lp_range):
+            if intf['type'] == 'loopback':
+                intf['intf_num'] = lp_fmt + str(int_num)
+                have_intf.append(intf)
+        # Single-homed
         for intf, int_num in zip(sl_need_intf, sl_range):
             if intf['dual_homed'] == False:
                 intf['intf_num'] = intf_fmt + str(int_num)
                 have_intf.append(intf)
-        # 4b. DUAL-HOMED: Adds the interface number to existing DM
+        # Dual-homed
         for intf, int_num in zip(dl_need_intf, dl_range):
             if intf['dual_homed'] == True:
                 intf['intf_num'] = intf_fmt + str(int_num)
@@ -236,304 +264,304 @@ class FilterModule(object):
         return all_intf
 
 
+################################################## DRY Functions used by RTR DATA-MODEL ##################################################
 
-
-
-
-
-
-
-
-
-
-    def svc_rtr_dm(self, hostname, bgp_grps, bgp_tnt, ospf, static_route, adv, fbc):
-
-
-        adv_bgp = adv['bgp']
-        redist = adv['redist']
-        name = adv_bgp['naming']
-        bse_intf = fbc['adv']['bse_intf']
-        as_num = fbc['route']['bgp']['as_num']
-        peers = defaultdict(list)
-        groups = defaultdict(dict)
-        all_pfx_lst = []
-        all_rm = []
-
-################################################## Functions for creating prefix-lists and route-maps ##################################################
-
-        # BGP_ATTR: Function to create the prefix-list and route-map data-models for BGP attribute associated prefixes (weight, local pref, med & AS-path)
-        def create_bgpattr_rm_pfx_lst(input_data, direction, bgp_attr, pl_name, rm_name):
-            # If BGP attribute is defined and is a prefix (list of 1 or more prefixes)
-            if input_data.get(direction, {}).get(bgp_attr) != None and isinstance(input_data.get(direction, {}).get(bgp_attr), dict) == True:
-                # Loop through each attribute dictionary {bgp_attr_value: [pfx, pfx, etc]}
-                for bgp_attr_value, all_pfx in input_data[direction][bgp_attr].items():
-                    self.rm_seq += 10           # Increment RM seq number by 10 each loop
-                    pl_seq = 0                  # The starting PL sequence number
-                    # Adds a tuple (pl_name, seq, action, pfx) to the list of all prefix-lists
-                    if isinstance(all_pfx, str) == True and all_pfx == 'any':
-                        all_pfx_lst.append((pl_name.replace('val', str(bgp_attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0 le 32'))
-                    else:
-                        for pfx in all_pfx:
-                            pl_seq += 5         # If it is a list of pfxs increments prefix-list sequence number by 5 each loop
-                            all_pfx_lst.append((pl_name.replace('val', str(bgp_attr_value)), pl_seq, 'permit', pfx))
-                    # Adds a tuple (rm_name, seq, pl_name, weight) to list of all route-maps
-                    all_rm.append((rm_name, self.rm_seq, pl_name.replace('val', str(bgp_attr_value)), (bgp_attr, bgp_attr_value)))
-                # Removes the BGP attribute key:value, if inbound/outbound dict is now empty deletes and adds new dict with route-map name as the key
-                del input_data[direction][bgp_attr]
-                if input_data[direction] == {}:
-                    del input_data[direction]
-                input_data[direction + '_rm'] = rm_name
-
-        # BGP ALLOW/DENY: Function to create the prefix-list and route-map for allowed and denied prefixes (added in RM order deny, allow, allow_any, deny_any)
-        def create_allowdeny_rm_pfx_lst(input_data, direction, pl_name, rm_name):
-            # return input_data
-            pl_seq = 0
-            # Loops DENY prefixes (will be a list) and adds tuple entry
-            if input_data.get(direction, {}).get('deny') != None and isinstance(input_data.get(direction, {}).get('deny'), list) == True:
+# BGP_ATTR: Function to create the prefix-list and route-map data-models for BGP attribute associated prefixes (weight, local pref, med & AS-path)
+    def create_bgpattr_rm_pfx_lst(self, input_data, direction, bgp_attr, pl_name, rm_name):
+        # If a BGP attribute is defined in the dictionary for that direction (inbound or outbound) the input_data is processed by this method
+        if input_data.get(direction, {}).get(bgp_attr) != None:
+            # 1. LOOP: Loop through each attribute dictionary {bgp_attr_value: [pfx, pfx, etc]}
+            for bgp_attr_value, all_pfx in input_data[direction][bgp_attr].items():
+                # 2. INCRE: Increment RM seq number by 10 each BGP_attr (loop) and set starting PL sequence number (as each bgp_attr has its own PL)
                 self.rm_seq += 10
-                for pfx in input_data[direction]['deny']:
-                    pl_seq += 5
-                    all_pfx_lst.append((pl_name, pl_seq, 'deny', pfx))
-                    all_rm.append((rm_name, self.rm_seq, pl_name, (None, None)))
-            # Loops through ALLOW prefixes and adds tuple entry
-            if input_data.get(direction, {}).get('allow') != None:
-                if isinstance(input_data.get(direction, {}).get('allow'), list) == True:
-                    # Adds RM_seq and RM entry as means above DENY if statment has not been matched
-                    if pl_seq == 0:
-                        self.rm_seq += 10
-                        all_rm.append((rm_name, self.rm_seq, pl_name, (None, None)))
-                    for pfx in input_data[direction]['allow']:
+                pl_seq = 0
+                # 3. CREATE_PL: Creates a tuple (pl_name, seq, action, pfx) which is added to the list of all prefix-lists
+                if isinstance(all_pfx, str) == True:
+                    # If the BGP_ATTR is applied to only a default route (default keyword)
+                    if all_pfx == 'default':
+                        self.all_pfx_lst.append((pl_name.replace('val', str(bgp_attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0'))
+                    # If the BGP_ATTR is applied to any traffic (any keyword)
+                    elif all_pfx == 'any':
+                        self.all_pfx_lst.append((pl_name.replace('val', str(bgp_attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0 le 32'))
+                # If the BGP_ATTR is applied to a list of prefixes
+                elif isinstance(all_pfx, list) == True:
+                    for pfx in all_pfx:
+                        # As is a list of multiple prefixes increments the prefix-list sequence number by 5 each loop
                         pl_seq += 5
-                        all_pfx_lst.append((pl_name, pl_seq, 'permit', pfx))
-                # If ALLOW is only 'default route' or 'any' uses pre-defined prefix list in RM entry
-                elif input_data.get(direction, {}).get('allow') == 'default':
-                    self.rm_seq += 10
-                    all_rm.append((rm_name, self.rm_seq, name['pl_default'], (None, None)))
-                    del input_data[direction]['allow']
-                elif input_data.get(direction, {}).get('allow') == 'any':
-                    self.rm_seq += 10
-                    all_rm.append((rm_name, self.rm_seq, name['pl_allow'], (None, None)))
-            # DENY ALL should always be last entry in route-map
-            if input_data.get(direction, {}).get('deny') != None and input_data.get(direction, {}).get('deny') == 'any':
-                self.rm_seq += 10
-                all_rm.append((rm_name, self.rm_seq, name['pl_deny'], (None, None)))
-            # If the inbound or putbound dict exists it is deleted the new dict added with the route-map name used as the key
-            if input_data.get(direction) != None:
+                        self.all_pfx_lst.append((pl_name.replace('val', str(bgp_attr_value)), pl_seq, 'permit', pfx))
+                # 4. CREATE_RM: Creates a tuple (rm_name, seq, pl_name, weight) which is added to the list of all route-maps
+                self.all_rm.append((rm_name, self.rm_seq, pl_name.replace('val', str(bgp_attr_value)), (bgp_attr, bgp_attr_value)))
+
+            # 5. CLEANUP: Removes the BGP attribute key:value, if inbound/outbound dict is now empty deletes
+            del input_data[direction][bgp_attr]
+            if input_data[direction] == {}:
                 del input_data[direction]
+            # 6. NEW_DICT: Adds a new dict for the direction of the filtering with route-map name as the key
             input_data[direction + '_rm'] = rm_name
 
 
-        # REDIST: Function to create the prefix-list and route-map for redistribution
-        # Creates the all_pfx_lst and all_rm lists before returning the RM name back
-        # RM format [name, seq, prx_list, attr], PL format [name, seq, permission, prx]
-        def create_redist_rm_pfx_lst(source, destination,allow_pfx, pfx_attr, tenant):
-
-            # EDIT_PL/RM_NAME: Joins routing protocol to the process, shortens connected and adds VRF to BGP (or would have conflicts)
-            if 'bgp_' in source:
-                source = source.replace('_', '').upper() + '_' + tenant
-            elif '_' in source:
-                source = source.replace('_', '').upper()
-            elif source == 'connected':
-                source = 'conn'
-
-            # Adds VRF to BGP for destination protocol (redistributing into BGP)
-            if 'BGP' in destination:
-                destination = destination.replace('_', '').upper() + '_' + tenant
-
-            # Creates names for all PL and RMs used by this function
-            pl_name = redist['pl_name'].replace('src', source).replace('dst', destination)
-            rm_name = redist['rm_name'].replace('src', source).replace('dst', destination)
-            pl_metric_name = redist['pl_metric_name'].replace('src', source).replace('dst', destination)
-
-            rm_seq = 0
-            # NO PFX_LST: Creates blank RM with on matching prefix-list if both allow and metric not defined
-            if allow_pfx == None and pfx_attr == None:
-                rm_seq += 10
-                all_rm.append((rm_name, rm_seq, None, (None, None)))
-
-
-            # METRIC: Creates the PL and RM for any prefixes that are to be redistributed with a metric value
-            if pfx_attr != None:
-                for attr_value, all_pfx in pfx_attr.items():
-                    rm_seq += 10        # Increment RM seq number by 10 each loop
-                    pl_seq = 0           # The starting PL sequence number
-                    # Adds a tuple (pl_name, seq, action, pfx) to the list of all prefix-lists
-                    if isinstance(all_pfx, str) == True and all_pfx == 'any':
-                        all_pfx_lst.append((pl_metric_name.replace('val', str(attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0 le 32'))
-                    else:
-                        for pfx in all_pfx:
-                            pl_seq += 5         # If it is a list of pfxs increments prefix-list sequence number by 5 each loop
-                            all_pfx_lst.append((pl_metric_name.replace('val', str(attr_value)), pl_seq, 'permit', pfx))
-                    # Adds a tuple (rm_name, seq, pl_name, weight) to list of all route-maps
-                    all_rm.append((rm_name, rm_seq, pl_metric_name.replace('val', str(attr_value)), ('metric', attr_value)))
-
-            # ALLOW: Creates the PL and RM for any prefixes that are to be redistributed with no metric value
-            if allow_pfx == 'any':
-                all_pfx_lst.append((pl_name, 5, 'permit', '0.0.0.0/0 le 32'))
-            elif allow_pfx != None and source == 'conn':
-                rm_seq += 20            # 20 as redist in tenant (tag of SVIs in tnt) is 10
-                all_rm.append((rm_name, rm_seq, ' '.join(allow_pfx), (None, None)))
-            elif allow_pfx != None:
-                pl_seq = 0
-                for pfx in allow_pfx:
+# BGP ALLOW/DENY: Function to create the prefix-list and route-map for allowed and denied prefixes (added in RM order deny/allow_spec, allow_any/deny_any)
+    def create_allowdeny_rm_pfx_lst(self, input_data, direction, pl_name, rm_name, dflt_pl):
+        # If a 'allow' or 'deny' are defined in the dictionary for that direction (inbound or outbound) the input_data is processed by this method
+        if input_data.get(direction, {}).get('allow') != None or input_data.get(direction, {}).get('deny') != None:
+            # Sets starting PL seq. Will be same prefix-list for all allow_specific and deny_specific rules so also have same RM statement (seq)
+            pl_seq = 0
+            # 1. DENY_SPECIFIC: Loops DENY prefixes (will be a list) and adds a tuple entry to the list of all prefix-lists
+            if input_data.get(direction, {}).get('deny') != None and isinstance(input_data.get(direction, {}).get('deny'), list) == True:
+                # Increments the RM sequence, all the deny statements will be in prefix list associated to this 1 RM entry
+                self.rm_seq += 10
+                for pfx in input_data[direction]['deny']:
+                    # Increments the PL sequence number by 5 for each prefix in the list (iteration of loop)
                     pl_seq += 5
-                    all_pfx_lst.append((pl_name, pl_seq, 'permit', pfx))
+                    # Adds the PL and RM entry at each prefix loop. The RM will alwasy be same so is just overwriting same entry each time.
+                    self.all_pfx_lst.append((pl_name, pl_seq, 'deny', pfx))
+                    self.all_rm.append((rm_name, self.rm_seq, pl_name, (None, None)))
+            # 2. ALLOW_SPECIFIC: Loops through ALLOW prefixes and adds tuple entry to the list of all prefix-lists
+            if input_data.get(direction, {}).get('allow') != None:
+                if isinstance(input_data.get(direction, {}).get('allow'), list) == True:
+                    # If the pl_seq has not been incremented it means the previous DENY if statment has not been matched, so needs to add the RM_seq and RM entry
+                    if pl_seq == 0:
+                        self.rm_seq += 10
+                        self.all_rm.append((rm_name, self.rm_seq, pl_name, (None, None)))
+                    for pfx in input_data[direction]['allow']:
+                        pl_seq += 5
+                        self.all_pfx_lst.append((pl_name, pl_seq, 'permit', pfx))
+                # 3. ALLOW_DEFAULT: Has string of 'default route', uses pre-defined prefix list 'pl_default' in RM entry
+                elif input_data.get(direction, {}).get('allow') == 'default':
+                    self.rm_seq += 10
+                    self.all_rm.append((rm_name, self.rm_seq, dflt_pl['pl_default'], (None, None)))
+                # 4. ALLOW_ANY: Has string of 'any', uses pre-defined prefix list 'pl_allow' in RM entry
+                elif input_data.get(direction, {}).get('allow') == 'any':
+                    self.rm_seq += 10
+                    self.all_rm.append((rm_name, self.rm_seq, dflt_pl['pl_allow'], (None, None)))
+            # 5. DENY_ANY: Should always be last entry in route-map. Has string of 'any', uses pre-defined prefix list 'pl_deny' in RM entry
+            if input_data.get(direction, {}).get('deny') != None and input_data.get(direction, {}).get('deny') == 'any':
+                self.rm_seq += 10
+                self.all_rm.append((rm_name, self.rm_seq, dflt_pl['pl_deny'], (None, None)))
+
+            # 6. CLEANUP: If the inbound/ outbound dict exists it is deleted
+            if input_data.get(direction) != None:
+                del input_data[direction]
+            # 7. NEW_DICT: Adds a new dict for the direction of the filtering with route-map name as the key
+            input_data[direction + '_rm'] = rm_name
+
+
+# REDISTRIBUTION: Function to create the prefix-list and route-map for prefixes to be redistributed and any changes to the metric.
+    def create_redist_rm_pfx_lst(self, source, destination, allow_pfx, pfx_attr, tnt, rm_pl_name, dflt_pl):
+        # 1a. EDIT_PL/RM_NAME: Joins routing protocol to the process/AS, shortens connected and adds VRF to BGP (or would have conflicts)
+        if 'bgp_' in source:
+            source = source.replace('_', '').upper() + '_' + tnt
+        elif '_' in source:
+            source = source.replace('_', '').upper()
+        elif source == 'connected':
+            source = 'conn'
+        # Adds VRF to BGP name for the destination protocol (redistributing into BGP)
+        if 'BGP' in destination:
+            destination = destination.replace('_', '').upper() + '_' + tnt
+        # 1b. RM_PL_NAMES: Creates names for all PL and RMs used by this function
+        pl_name = rm_pl_name['pl_name'].replace('src', source).replace('dst', destination)
+        rm_name = rm_pl_name['rm_name'].replace('src', source).replace('dst', destination)
+        pl_metric_name = rm_pl_name['pl_metric_name'].replace('src', source).replace('dst', destination)
+
+        rm_seq = 0
+       # 2. NO PFX_LST: Creates blank RM with on matching prefix-list if both allow and metric not defined (redistribute all)
+        if allow_pfx == None and pfx_attr == None:
+            rm_seq += 10
+            self.all_rm.append((rm_name, rm_seq, None, (None, None)))
+
+        # 3. METRIC: Creates the PL and RM for any prefixes that are to be redistributed with a metric value
+        elif pfx_attr != None:
+            #LOOP: Loops through each metric:pfx(list) dixt creating a seperate PL and RM entry for each one
+            for attr_value, all_pfx in pfx_attr.items():
+                #SEQ: Increment RM seq number by 10 for each loop and resets the PL sequence number
                 rm_seq += 10
-                all_rm.append((rm_name, rm_seq, pl_name, (None, None)))
+                pl_seq = 0
+                # 3a. DEFAULT: If redistributing only default route (default keyword) with a metric value
+                if isinstance(all_pfx, str) == True and all_pfx == 'default':
+                    self.all_pfx_lst.append((pl_metric_name.replace('val', str(attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0'))
+                # 3b. ANY: If redistributing only all prefixes (any keyword) with a metric value
+                elif isinstance(all_pfx, str) == True and all_pfx == 'any':
+                    self.all_pfx_lst.append((pl_metric_name.replace('val', str(attr_value)), pl_seq + 5, 'permit', '0.0.0.0/0 le 32'))
+                # 3c. PREFIXES: Adds all prefixes in the list to the one PL, incrementing the prefix-list sequence number by 5 each loop
+                else:
+                    for pfx in all_pfx:
+                        pl_seq += 5
+                        self.all_pfx_lst.append((pl_metric_name.replace('val', str(attr_value)), pl_seq, 'permit', pfx))
+                # 3c, RM: Adds a tuple (rm_name, seq, pl_name, (metric, metric_value)) to list of all route-maps
+                self.all_rm.append((rm_name, rm_seq, pl_metric_name.replace('val', str(attr_value)), ('metric', attr_value)))
 
-            return rm_name      # RM_name returned back to be added to the OSPF_proc dict
+        # 4a. ALLOW_DFLT: Adds 10 to the rm_seq and adds a RM entry with the predefind 'default' PL (no metric)
+        if allow_pfx == 'default':
+            rm_seq += 10
+            self.all_rm.append((rm_name, rm_seq, dflt_pl['pl_default'], (None, None)))
+        # 4b. ALLOW_ANY: Adds 10 to the rm_seq and adds a RM entry with the predefind 'any' PL (no metric)
+        elif allow_pfx == 'any':
+            rm_seq += 10
+            self.all_rm.append((rm_name, rm_seq, dflt_pl['pl_allow'], (None, None)))
+        # 4c. CONN: RM_SEQ starts at 20 as RM already exists (created in svc_tnt). No PL so adds interfaces in its place in the RM list
+        elif allow_pfx != None and source == 'conn':
+            rm_seq += 20                                                                    # 20 as redist in tenant (tag of SVIs in tnt) is 10
+            self.all_rm.append((rm_name, rm_seq, ' '.join(allow_pfx), (None, None)))        # Adds interfaces rather than PL name
+        # 4d. ALLOW: Creates PL of all prefixes (seq 5 between) and adds 10 to the rm_seq before adding a RM entry (no metric)
+        elif allow_pfx != None:
+            pl_seq = 0
+            for pfx in allow_pfx:
+                pl_seq += 5
+                self.all_pfx_lst.append((pl_name, pl_seq, 'permit', pfx))
+            rm_seq += 10
+            self.all_rm.append((rm_name, rm_seq, pl_name, (None, None)))
 
-################################################## BGP data-model creation ##################################################
+        # 5. Returns the RM name back to be added to the  BGP or OSPF redist dictionary
+        return rm_name
 
 
-        # 1. GROUPS and PEERS :Creates a dictionary of Groups/templates (key is grp_name) and a dictionary of peers (key is vrf_name) on this device.
+###################################### RTR DATA MODEL: Uses input from service_routing.yml ######################################
+# Creates 7 data models for Prefix-lists, Route-maps, BGP groups, BGP peers, BGP tenants (network, summary, redist), OSPF processes, OSPF interfaces and static routes
+
+    def svc_rtr_dm(self, hostname, bgp_grps, bgp_tnt, ospf, static_route, adv, fbc):
+        # These hold ALL prefix-lists and route-maps created by the external methods for all elements of BGP and OSPF (filtering, path manipulation & redistribution)
+        self.all_pfx_lst, self.all_rm = ([] for i in range(2))
+
+################################ BGP data models ################################
+        pl_rm_name = adv['bgp']['naming']
+        bse_intf = fbc['adv']['bse_intf']
+        as_num = fbc['route']['bgp']['as_num']
+        peer = defaultdict(list)
+        group, tenant = (defaultdict(dict) for i in range(2))
+
+        # 1. CREATE_DICT: Creates a dictionary of Groups (key is grp_name) and a dictionary of peer (key is vrf_name) on this device.
         for grp in bgp_grps:
-            # Set default values if the switch or tenant keys are not specified in group
+            # DFLT_VAL: Set default values if the switch or tenant keys are not specified in group
             grp.setdefault('switch', [])
             grp.setdefault('tenant', None)
-            for peer in grp['peers']:
-                # If switch or tenant are not specified in peer use group values
-                # !!!!! HAVE REMOVED 1 LEVEL of LOOPs, can delete once happy not added any issues
-                # for sw in peer.setdefault('switch', grp['switch']):
-                if hostname in peer.setdefault('switch', grp['switch']):
-                    # if sw  == hostname:
-                    # PEERS: Formatting to create the peer dictionary on this device
-                    peer.setdefault('tenant', grp['tenant'])
-                    del peer['switch']              # No longer needed in the dict
-                    peer['grp'] = grp['name']       # Adds new dict for group name
-                    tenant = peer.pop('tenant')	    # No longer needed in the dict
-                    # Creates new dictionary of VRFs with the values being lists of the peer dictionaries within that VRF
-                    if isinstance(tenant, list) == True:        # If peer is multiple tenants
-                        for tnt in tenant:
-                            peers[tnt].append(peer.copy())      # Need copy or cant edit later as same object referencec multiple times
-                    else:                                       # If peer is only in 1 tenants
-                        peers[tenant].append(peer)
 
-                    # GROUPS: Creates new dictionary with the Key the name of the group/templates and the values being its attributes
-                    groups[grp['name']]['timers'] = grp.setdefault('timers', adv_bgp['timers'])
-                    groups[grp['name']] = grp
+            # 1a. PEER_FMT: Formatting in preparation to create the peer dictionary
+            for each_peer in grp['peer']:
+                # DFLT_VAL: If switch or tenant is not specified in peer adds the group values
+                if hostname in each_peer.setdefault('switch', grp['switch']):
+                    each_peer.setdefault('tenant', grp['tenant'])
+                    # Adds new dict for group name, removes switch (no longer needed) and pops tenanat to use in creating next peer dict
+                    each_peer['grp'] = grp['name']
+                    del each_peer['switch']
+                    tnt = each_peer.pop('tenant')
+                    # PEER_DICT: Creates new dictionary of VRFs with the values being lists of the peer dictionaries within that VRF
+                    for each_tnt in tnt:
+                        peer[each_tnt].append(each_peer.copy())  # Needs a copy or you cant edit later as mutable (same object reference multiple times)
 
-        # GROUP: Loop through each group, create prefix-lists and route maps before delting unneeded dictionaries
-        for grp in groups.values():
-            # CLEANUP: No need for the switch, tenant and peers dictionaires anymore
-            del grp['switch']
-            del grp['peers']
-            del grp['tenant']
-            # INBOUND: Runs functions on inbound methods to get prefix-lists and route maps for inbound traffic control
+                    # 1b. GROUP_DICT: Creates new dictionary with the Key the name of the group/templates and the values being its attributes
+                    group[grp['name']]['timers'] = grp.setdefault('timers', adv['bgp']['timers'])     # Sets default BGP timers for groups if not specified
+                    group[grp['name']] = grp
+
+        # 2. RM_GROUP: Loop through each group to create the prefix-lists and route-maps for allow/deny and BGP attributes
+        for grp in group.values():
+            # CLEANUP: No need for the switch, tenant and peer dictionaries anymore
+            del grp['switch'], grp['peer'], grp['tenant']
+            # INBOUND: Runs functions to create prefix-lists and route maps for inbound traffic control. Allow/Deny is run after the BGP attributes have been added
+            self.rm_seq = 0         # All below filters in same RM, so incremented in each method (why has to be self. and not passed in as an arg)
+            self.create_bgpattr_rm_pfx_lst(grp, 'inbound', 'weight', pl_rm_name['pl_wght_in'].replace('name', grp['name']), pl_rm_name['rm_in'].replace('name', grp['name']))
+            self.create_bgpattr_rm_pfx_lst(grp, 'inbound', 'pref', pl_rm_name['pl_pref_in'].replace('name', grp['name']), pl_rm_name['rm_in'].replace('name', grp['name']))
+            self.create_allowdeny_rm_pfx_lst(grp, 'inbound', pl_rm_name['pl_in'].replace('name', grp['name']), pl_rm_name['rm_in'].replace('name', grp['name']), adv['dflt_pl'])
+            # OUTBOUND: Runs functions on inbound methods to create prefix-lists and route maps for inbound traffic control
             self.rm_seq = 0
-            create_bgpattr_rm_pfx_lst(grp, 'inbound', 'weight', name['pl_wght_in'].replace('name', grp['name']), name['rm_in'].replace('name', grp['name']))
-            create_bgpattr_rm_pfx_lst(grp, 'inbound', 'pref', name['pl_pref_in'].replace('name', grp['name']), name['rm_in'].replace('name', grp['name']))
-            create_allowdeny_rm_pfx_lst(grp, 'inbound', name['pl_in'].replace('name', grp['name']), name['rm_in'].replace('name', grp['name']))
-            # OUTBOUND: Runs functions on inbound methods to get prefix-lists and route maps for inbound traffic control
-            self.rm_seq = 0
-            create_bgpattr_rm_pfx_lst(grp, 'outbound', 'med', name['pl_med_out'].replace('name', grp['name']), name['rm_out'].replace('name', grp['name']))
-            create_bgpattr_rm_pfx_lst(grp, 'outbound', 'as_prepend', name['pl_aspath_out'].replace('name', grp['name']), name['rm_out'].replace('name', grp['name']))
-            create_allowdeny_rm_pfx_lst(grp, 'outbound', name['pl_out'].replace('name', grp['name']), name['rm_out'].replace('name', grp['name']))
+            self.create_bgpattr_rm_pfx_lst(grp, 'outbound', 'med', pl_rm_name['pl_med_out'].replace('name', grp['name']), pl_rm_name['rm_out'].replace('name', grp['name']))
+            self.create_bgpattr_rm_pfx_lst(grp, 'outbound', 'as_prepend', pl_rm_name['pl_aspath_out'].replace('name', grp['name']), pl_rm_name['rm_out'].replace('name', grp['name']))
+            self.create_allowdeny_rm_pfx_lst(grp, 'outbound', pl_rm_name['pl_out'].replace('name', grp['name']), pl_rm_name['rm_out'].replace('name', grp['name']), adv['dflt_pl'])
 
-        # PEER: Loop through each peer, create prefix-lists and route maps before delting unneeded dictionaries (switch, tenant, peers)
-        for all_pr in peers.values():
+        # 3. RM_PEER: Loop through each group to create the prefix-lists and route-maps for allow/deny and BGP attributes
+        for all_pr in peer.values():
             for pr in all_pr:
-                # INBOUND: Runs functions on inbound methods to get prefix-lists and route maps for inbound traffic control
+                # INBOUND: Runs functions to create prefix-lists and route maps for inbound traffic control. Allow/Deny is run after the BGP attributes have been added
                 self.rm_seq = 0
-                create_bgpattr_rm_pfx_lst(pr, 'inbound', 'weight', name['pl_wght_in'].replace('name', pr['name']), name['rm_in'].replace('name', pr['name']))
-                create_bgpattr_rm_pfx_lst(pr, 'inbound', 'pref', name['pl_pref_in'].replace('name', pr['name']), name['rm_in'].replace('name', pr['name']))
-                create_allowdeny_rm_pfx_lst(pr, 'inbound', name['pl_in'].replace('name', pr['name']), name['rm_in'].replace('name', pr['name']))
-                # OUTBOUND: Runs functions on inbound methods to get prefix-lists and route maps for inbound traffic control
+                self.create_bgpattr_rm_pfx_lst(pr, 'inbound', 'weight', pl_rm_name['pl_wght_in'].replace('name', pr['name']), pl_rm_name['rm_in'].replace('name', pr['name']))
+                self.create_bgpattr_rm_pfx_lst(pr, 'inbound', 'pref', pl_rm_name['pl_pref_in'].replace('name', pr['name']), pl_rm_name['rm_in'].replace('name', pr['name']))
+                self.create_allowdeny_rm_pfx_lst(pr, 'inbound', pl_rm_name['pl_in'].replace('name', pr['name']), pl_rm_name['rm_in'].replace('name', pr['name']), adv['dflt_pl'])
+                # OUTBOUND: Runs functions on inbound methods to create prefix-lists and route maps for inbound traffic control
                 self.rm_seq = 0
-                create_bgpattr_rm_pfx_lst(pr, 'outbound', 'med', name['pl_med_out'].replace('name', pr['name']), name['rm_out'].replace('name', pr['name']))
-                create_bgpattr_rm_pfx_lst(pr, 'outbound', 'as_prepend', name['pl_aspath_out'].replace('name', pr['name']), name['rm_out'].replace('name', pr['name']))
-                create_allowdeny_rm_pfx_lst(pr, 'outbound', name['pl_out'].replace('name', pr['name']), name['rm_out'].replace('name', pr['name']))
+                self.create_bgpattr_rm_pfx_lst(pr, 'outbound', 'med', pl_rm_name['pl_med_out'].replace('name', pr['name']), pl_rm_name['rm_out'].replace('name', pr['name']))
+                self.create_bgpattr_rm_pfx_lst(pr, 'outbound', 'as_prepend', pl_rm_name['pl_aspath_out'].replace('name', pr['name']), pl_rm_name['rm_out'].replace('name', pr['name']))
+                self.create_allowdeny_rm_pfx_lst(pr, 'outbound', pl_rm_name['pl_out'].replace('name', pr['name']), pl_rm_name['rm_out'].replace('name', pr['name']), adv['dflt_pl'])
 
-        # Get rid of any duplicates casued by using same peer in multiple VRFs
-        all_pfx_lst = set(all_pfx_lst)
-        all_pfx_lst = list(all_pfx_lst)
-        all_pfx_lst.sort()
-        all_rm = set(all_rm)
-        all_rm = list(all_rm)
-        all_rm.sort()
+        # 4. PFX_LST_RM_CLEANUP: Get rid of any duplicates casued by using same peer in multiple VRFs
+        self.all_pfx_lst = set(self.all_pfx_lst)
+        self.all_pfx_lst = list(self.all_pfx_lst)
+        self.all_pfx_lst.sort()
+        self.all_rm = set(self.all_rm)
+        self.all_rm = list(self.all_rm)
+        self.all_rm.sort()
 
-
-        # NETWORK & SUMMARY and REDIST: repurpose the tenant key
-        tenant = defaultdict(dict)
+        ### Summary, Network and redistribution are configured on a per tenant (VRF) rather than per-group or per-peer basis ###
         for tnt in bgp_tnt:
-            tnt.setdefault('switch', [])           # Uses empty list if switch not specified, needed to allow using tnenant swithc as default
-            # If NETWORK, SUMMARY or REDIST are defined for this switch creates DM for that
+            # 5a. TMP_VARS: Collect all information for that element per-teant, so reset at each interation
+            summ_tmp = {}
+            net_tmp, redist_tmp = ([] for i in range(2))
+            # 5b. DFLT_VAL: If switch is not specified in for the tnt uses emtpy list (needed to allow using tenant switch as the default)
+            tnt.setdefault('switch', [])           # Uses empty list if switch not specified,
 
+            # 6a. NETWORK: Replaces 'network' dict with just those on to be added on this devices
             if tnt.get('network') != None:
-                pfx_tmp = []
                 for pfx in tnt['network']:
-                    # if hostname in pfx['switch']:
                     if hostname in pfx.setdefault('switch', tnt['switch']):
-                        pfx_tmp.extend(pfx['prefix'])
-            tenant[tnt['name']]['network'] = pfx_tmp
-
+                        net_tmp.extend(pfx['prefix'])
+            tenant[tnt['name']]['network'] = net_tmp
+            # 6b. SUMMARY: Replaces 'summary' dict with just those on to be added on this devices. Add dummy value for summary if doesnt have one
             if tnt.get('summary') != None:
-                pfx_tmp = {}
                 for pfx in tnt['summary']:
-                    # if hostname in pfx['switch']:
                     if hostname in pfx.setdefault('switch', tnt['switch']):
-                        # Add dummy value for summary if doesnt have one
-                        pfx.setdefault('filter', None)
                         for each_pfx in pfx['prefix']:
-                            pfx_tmp[each_pfx] = pfx.get('filter', None)
-            tenant[tnt['name']]['summary'] = pfx_tmp
+                             summ_tmp[each_pfx] = pfx.setdefault('filter', None)
+            tenant[tnt['name']]['summary'] = summ_tmp
 
+            # 7. REDIST: Replaces 'redist' dict with just those on to be added on this devices and extra element with rm_name
             if tnt.get('redist') != None:
-                redist_tmp = []
                 for each_redist in tnt['redist']:
-                    if hostname in pfx.setdefault('switch', tnt['switch']):
-                        # Creates the prefix-lists and route-maps before returning the RM name
-                        rm_name = create_redist_rm_pfx_lst(each_redist['type'], 'BGP' + str(as_num), each_redist.setdefault('allow', None), each_redist.setdefault('metric', None), tnt['name'])
-
-
-                        # rm_name = create_redist_rm_pfx_lst('BGP' + str(as_num), each_redist['type'], each_redist.setdefault('allow', None), each_redist.setdefault('metric', None), tnt['name'])
-                        # Replace '_' for ' ' so is in correct format for when cmd is sued in the template
+                    if hostname in each_redist.setdefault('switch', tnt['switch']):
+                        # 7a. CREATE PL/RM: Runs functions to create the prefix-lists and route maps used with redist. The RM name is returned
+                        rm_name = self.create_redist_rm_pfx_lst(each_redist['type'], 'BGP' + str(as_num), each_redist.setdefault('allow', None), each_redist.setdefault('metric', None), tnt['name'], adv['redist'], adv['dflt_pl'])
+                        # 7b. RENAME & CLEANUP: Replace '_' for ' ' so is in correct format for when cmd is used in the jinja template
                         if '_' in each_redist['type']:
                             each_redist['type'] = each_redist['type'].replace('_', ' ')
-                        # Adds RM name and cleans up non-needed dicst before addint to tenant dict
+                        del each_redist['allow'], each_redist['metric'], each_redist['switch']
+                        # 7c. UPDATE_DICT: Add RM_name to orignal dict before adding that dict to the new tenant dictioanry
                         each_redist['rm_name'] = rm_name
-                        del each_redist['allow']
-                        del each_redist['metric']
-                        if each_redist.get('switch') != None:
-                            del each_redist['switch']
                         redist_tmp.append(each_redist)
             tenant[tnt['name']]['redist'] = redist_tmp
 
-################################################## OSPF data-model creation ##################################################
+################################ OSPF data-model creation ################################
 
-
-        # DEVICE: Creates 2 dictionaries, a per-OSPF process dict of process settings and a per-interface dict of ospf interface settings
+        # Creates 2 dictionaries, a per-OSPF process dict of process settings and a per-interface dict of ospf interface settings
         ospf_proc, ospf_intf,  = ({} for i in range(2))
+
         for proc in ospf:
-            # Set default values if the switch or default_orig key not specified.
-            proc.setdefault('switch', [])               # Uses empty list
-            proc.setdefault('default_orig', None)       # Uses None as is blank if referenced in template (instaed of 'always')
-            # This dict and list are reset for each loop interation (ospf process)
+            # 1a. TMP_VARS: The dict and lists are reset for each loop interation (ospf process)
             area_type_tmp = {}
             auth_tmp, summ_tmp, redist_tmp = ([] for i in range(3))
+            # 1b. DFLT_VAL: Set default values if the switch or default_orig keys are not specified in the process
+            proc.setdefault('switch', [])               # Uses empty list
+            proc.setdefault('default_orig', None)       # Uses None as is blank if referenced in template (instaed of 'always')
 
-            #INTF: Creates dictionary and process config values for interfaces on this device (uses process switch if not defined)
+            #1c. LOOP: Loops through each interface in the process, only creates the new dicts if OSPF process orinterface is on this switch
             for intf in proc['interface']:
-                # Only creates the new dictionaires if OSPF process or OSPF interface is on this switch
                 if hostname in intf.setdefault('switch', proc['switch']):
-                    # PROC: Creates OSPF proceess as a dictionary if on this switch
+                    # 2. PROC_DICT: Uses OSPF process number as the key and its settings as the value in the new process dictionary
                     ospf_proc[proc['process']] = proc
-                    # If it is special area (stub, nssa, etc) or uses authetication adds to temp_vars to be added to proc dict later
+                    # 2a. PROC_ATTR: If it is special area (stub, nssa, etc) or uses authetication adds to temp_vars to be added to process dict later
                     if intf.get('area_type') != None:
                         area_type_tmp[intf['area']] = intf['area_type']
                         del intf['area_type']
                     if intf.get('authetication') != None:
                         auth_tmp.append(intf['area'])
 
-                    # INTF: Adds the process number to the dict of interfaces (key) and there OPSF configuration (value)
+                    # 3. INTF_PROC: Adds the process number to the existing interfaces dictionary
+                    # intf.pop('switches', None)
                     intf['proc'] = proc['process']
                     for each_intf in intf['name']:
-                        # Changes the short interface name for full interface name
+                        # 3a. INTF_NAME: Changes the short interface name for full interface name
                         if bse_intf['intf_short'] in each_intf:
                             each_intf = each_intf.replace(bse_intf['intf_short'], bse_intf['intf_fmt'])
+                        # 3c. INTF_DICT: Uses Interface name as the key and its OSPF settings as the value in the new process dictionary
                         ospf_intf[each_intf] = intf
 
-            # SUMM/REDIST: Creates dictionaries for summaries and redistributions on this device (uses process switch if not defined)
+            # 4a. TMP_SUMM/REDIST: Creates temp lists of summary and redist dictionaries on this device (uses process switch if switch not defined)
             if proc.get('summary') != None:
                 for each_smry in proc['summary']:
                     if hostname in each_smry.setdefault('switch', proc['switch']):
@@ -543,70 +571,76 @@ class FilterModule(object):
                     if hostname in each_redist.setdefault('switch', proc['switch']):
                         redist_tmp.append(each_redist)
 
-            # PROC: Adds the temp vars that were just created either as new (auth & area_type) or replacing existing (summ & redist)
-            ospf_proc[proc['process']]['area_type'] = area_type_tmp
-            auth = set(auth_tmp)
-            ospf_proc[proc['process']]['auth'] = list(auth)
-            ospf_proc[proc['process']]['summary'] = summ_tmp
-            ospf_proc[proc['process']]['redist'] = redist_tmp
+            # 4b. PROC_ATTR: Adds to the process dict the temp_vars that were created either as new dicts or replacing existingdicts
+            if ospf_proc.get(proc['process']) != None:                                  # Required incase a device doesnt have a OSPF process
+                ospf_proc[proc['process']]['area_type'] = area_type_tmp                 # Adds area type as new dict
+                auth = set(auth_tmp)                                                    # Needs to first get rid of duplicates
+                ospf_proc[proc['process']]['auth'] = list(auth)                         # Adds area type as new dict
+                ospf_proc[proc['process']]['summary'] = summ_tmp                        # Replaces existing summary with device-specific summary
+                ospf_proc[proc['process']]['redist'] = redist_tmp                       # Replaces existing redist with device-specific redist
 
-
-        for proc, cfg in ospf_proc.items():
-            # Deletes interface and switch dicts from process as no longer needed
-            del cfg['interface']
-            del cfg['switch']
-            # SUMMARY and REDIST: Creates new lists            Adds None for summary so in template can use the variable and it will be blank (saves if statements in jinja)
-            if cfg.get('summary') != None:
-                for each_smry in cfg['summary']:
-                    del each_smry['switch']         # No longer needed
-                    pfx_tmp = {}
-                    # Creates list of dicts [{prfx: filter}, {prfx: filter}, etc] for each summary using None if it doenst exist
-                    for pfx in each_smry['prefix']:
-                        # pfx_tmp[pfx] = each_smry.get('filter', None)
-                        pfx_tmp[pfx] = each_smry.setdefault('filter', None)
-                    each_smry['prefix'] = pfx_tmp
-                    del each_smry['filter']             # Deletes the filter as no longer needed
-
-            # REDIST:
-            if cfg.get('redist') != None:
-                for each_redist in cfg['redist']:
-                    del each_redist['switch']
-                    # Creates the prefix-lists and route-maps before returning the RM name
-                    rm_name = create_redist_rm_pfx_lst(each_redist['type'], 'OSPF' + str(proc), each_redist.setdefault('allow', None), each_redist.setdefault('metric', None), cfg['tenant'])
-                    # Replace '_' for ' ' so is in correct format for when cmd is sued in the template
-                    if '_' in each_redist['type']:
-                        each_redist['type'] = each_redist['type'].replace('_', ' ')
-                    # Add the route map name as a dictionary and remove 'allow' and 'metric'
-                    each_redist['rm_name'] = rm_name
-                    del each_redist['allow']
-                    del each_redist['metric']
-
-
-        # Cleanup the not-needed dicts (the switch list and interface list)
+        # 5. INTF_CLEANUP: Remove the not-needed dicts. Couldnt be done earlier as can have muliple intefraces with same config
         for intf in ospf_intf.values():
-            intf.pop('switches', None)
+            intf.pop('switch', None)
             intf.pop('name', None)
 
+        for proc, cfg in ospf_proc.items():
+            # CLEANUP: Deletes interface and switch dicts from process as no longer needed
+            del cfg['interface'], cfg['switch']
+             # 6. SUMMARY: Creates list of dicts [{prfx: filter}, {prfx: filter}, etc] for each summary, uses 'None; if filter doenst exist
+            if cfg.get('summary') != None:
+                for each_smry in cfg['summary']:
+                    pfx_tmp = {}
+                    for pfx in each_smry['prefix']:
+                        pfx_tmp[pfx] = each_smry.setdefault('filter', None)
+                    # 6b. UPDATE_DICT: Replaces existing summary dictionary value with new one
+                    each_smry['prefix'] = pfx_tmp
+                     # 6c. CLEANUP: Delete no longer needed dictionaries
+                    del each_smry['filter'], each_smry['switch']
 
-        # STATIC_ROUTES
+            # 7a. REDIST: Replaces 'redist' dict with just those on to be added on this devices and extra element with rm_name
+            if cfg.get('redist') != None:
+                for each_redist in cfg['redist']:
+                    # CREATE PL/RM: Runs functions to create the prefix-lists and route maps used with redist. The RM name is returned
+                    rm_name = self.create_redist_rm_pfx_lst(each_redist['type'], 'OSPF' + str(proc), each_redist.setdefault('allow', None), each_redist.setdefault('metric', None), cfg['tenant'], adv['redist'], adv['dflt_pl'])
+                    # 7b. RENAME & CLEANUP: Replace '_' for ' ' so is in correct format for when cmd used in template, delete uneeded dictionaries
+                    if '_' in each_redist['type']:
+                        each_redist['type'] = each_redist['type'].replace('_', ' ')
+                    del each_redist['allow'], each_redist['metric'], each_redist['switch']
+
+                    # 7c. UPDATE_DICT: Adds RM name to the existing redist dictioanry
+                    each_redist['rm_name'] = rm_name
+
+
+################################ Static route data-model creation ################################
+
+        # Creates a new dictionary {vrf: [rte_details], vrf: [rte_details]} of routes per VRF
         stc_rte = defaultdict(list)
         for grp in static_route:
+            # 1. DFLT_VAL: Set default values for the switch if not specified in the VRF
             grp.setdefault('switch', [])
+            # 2. LOOP_TNT: Loops through the tenants resetting the temp_var each time so it is a list of routes only on that tenant
             for tnt in grp['tenant']:
                 rte_tmp = []
+                # 3. LOOP_RTE: Loops through routes finding those on this device, uses the switch from the tenant if not specified
                 for each_route in grp['route']:
                     if hostname in each_route.setdefault('switch', grp['switch']):
-                        # Create default values of None so can put in template but be empty if not specified
+                        # 4. DFLT_VAL: Creates default values of None so can put added in JINJA template but be empty if that option is not configured
                         each_route.setdefault('interface', None)
                         each_route.setdefault('ad', None)
+                        # 5a. ADD_TEMP_VAR: Adds all routes into the temp_var list
                         rte_tmp.append(each_route)
-                stc_rte[tnt].extend(rte_tmp)
+                #5b. ADD_DICT: If are routes in a VRF adds new dict of {vrf: rte_details} to the new dictionary
+                if len(rte_tmp) != 0:
+                    stc_rte[tnt].extend(rte_tmp)
 
-        # Cleanup the not-needed dicts (the switch list) and wap short intf name for full name
+        # 6. CLEANUP: Deletes switch (couldnt do in last loop if route used by muliple tenants) and swap short intf name for full intf name
         for route in stc_rte.values():
             for each_route in route:
                 each_route.pop('switch', None)
                 if each_route['interface'] != None:
                     each_route['interface'] = each_route['interface'].replace(bse_intf['intf_short'], bse_intf['intf_fmt'])
 
-        return [all_pfx_lst, all_rm, dict(groups), dict(peers), dict(tenant), ospf_proc, ospf_intf, dict(stc_rte)]
+
+#### Output returned back to asnible to be used in the jinja2 template
+        return [self.all_pfx_lst, self.all_rm, dict(group), dict(peer), dict(tenant), ospf_proc, ospf_intf, dict(stc_rte)]

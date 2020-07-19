@@ -5,6 +5,7 @@
   - name: "SYS >> Getting list of unused interfaces"
     set_fact:
       flt_dflt_intf: "{{ hostvars[inventory_hostname] |get_intf(fbc.adv.bse_intf, flt_svc_intf |default(None)) }}"
+
   - name: "SYS >> Generating default interface config snippet"
     template:
       src: "{{ ansible_network_os }}/dflt_intf_tmpl.j2"

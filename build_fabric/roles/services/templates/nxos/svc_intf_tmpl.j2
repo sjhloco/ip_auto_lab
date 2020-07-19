@@ -4,7 +4,11 @@ interface {{ intf.intf_num }}
   description {{ intf.descr }}
 {% if intf.type == 'layer3' %}
   no switchport
+{% endif %}
+{# Common config for all Layer3 and loopback ports #}
+{% if intf.type == 'layer3' or intf.type == 'loopback' %}{% if intf.tenant is defined %}
   vrf member {{ intf.tenant }}
+{% endif %}
   ip address {{ intf.ip_vlan }}
 {% else %}
 {# Common config for all Layer2 ports #}

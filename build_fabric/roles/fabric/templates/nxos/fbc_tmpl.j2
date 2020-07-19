@@ -111,10 +111,10 @@ router bgp {{ fbc.route.bgp.as_num }}
 {% for dvc in groups[bse.device_name.leaf.split('-')[-1].lower()] + groups[bse.device_name.border.split('-')[-1].lower()] %}
   neighbor {{ hostvars[dvc]['intf_lp'][0]['ip'] |ipaddr('address') }}
     description {{ dvc }}
-    inherit peer fabric_peering
+    inherit peer FABRIC
 {% endfor %} {% else %}
 {% for sp in groups[bse.device_name.spine.split('-')[-1].lower()] %}
   neighbor {{ hostvars[sp]['intf_lp'][0]['ip'] |ipaddr('address') }}
     description {{ sp }}
-    inherit peer fabric_peering
+    inherit peer FABRIC
 {% endfor %} {% endif %}

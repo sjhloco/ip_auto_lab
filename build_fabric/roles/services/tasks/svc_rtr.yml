@@ -5,7 +5,7 @@
   block:
     - name: "SYS >> Creating per-device service_routing data-models"
       set_fact:
-        flt_svc_rtr: "{{ inventory_hostname |create_svc_rtr_dm(svc_rtr.bgp.groups |default (), svc_rtr.bgp.tenant |default (),
+        flt_svc_rtr: "{{ inventory_hostname |create_svc_rtr_dm(svc_rtr.bgp.group |default (), svc_rtr.bgp.tenant |default (),
                          svc_rtr.ospf |default (), svc_rtr.static_route |default (), svc_rtr.adv, fbc) }}"
       changed_when: False           # Stops it reporting changes in playbook summary
   check_mode: False                 # These tasks still make changes when in check mode

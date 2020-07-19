@@ -103,7 +103,7 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             # Creates the RTR loopback by adding the num_incr and device_ip_incr to the the network address and then adding subnet and adds to dict
             rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['spine_ip'] + incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
             # Creates dict in format sp_name: [{name:lp, ip:lp_ip, descr:lp_descr}) used in next method to create the inventory
-            self.all_lp[self.spine[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]}]
+            self.all_lp[self.spine[incr_num -1]] = [{'name': self.bse_intf['lp_fmt'] + str(self.lp['rtr']['num']), 'ip': rtr_ip, 'descr': self.lp['rtr']['descr']}]
             num_sp -= 1        # Reduces number of spines each iteration
 
         # 3b. LEAF: Generates name, management, Loopback IPs (rtr, vtep, mlag), mlag peer IP and adds to self.all_x dictionaries (leaf_name is the key)
@@ -118,8 +118,8 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             self.all_mgmt[self.leaf[incr_num -1]] = str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['leaf_ip'] + incr_num -1])
             rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_ip'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
             vtep_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['leaf_vtep_lp'] + incr_num -1) + '/' + self.addr['lp_net'].split('/')[1]
-            self.all_lp[self.leaf[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]},
-                                                   {'name': list(self.lp['vtep'].keys())[0], 'ip': vtep_ip, 'descr': list(self.lp['vtep'].values())[0],
+            self.all_lp[self.leaf[incr_num -1]] = [{'name': self.bse_intf['lp_fmt'] + str(self.lp['rtr']['num']), 'ip': rtr_ip, 'descr': self.lp['rtr']['descr']},
+                                                   {'name': self.bse_intf['lp_fmt'] + str(self.lp['vtep']['num']), 'ip': vtep_ip, 'descr': self.lp['vtep']['descr'],
                                                    'mlag_lp_addr': mlag_ip}]
             # Generates MLAG peer IP and adds to dictionary
             self.mlag_peer[self.leaf[incr_num -1]] = str(ip_network(self.addr['mlag_net'], strict=False)[int(self.leaf[incr_num -1][-2:]) +
@@ -138,10 +138,10 @@ class InventoryModule(BaseInventoryPlugin, Constructable, Cacheable):
             self.all_mgmt[self.border[incr_num -1]] = str(ip_network(self.addr['mgmt_net'], strict=False)[self.addr_incre['border_ip'] + incr_num -1])
             rtr_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_ip'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
             vtep_ip = str(ip_network(self.addr['lp_net'])[0] + self.addr_incre['border_vtep_lp'] + incr_num - 1) + '/' + self.addr['lp_net'].split('/')[1]
-            self.all_lp[self.border[incr_num -1]] = [{'name': list(self.lp['rtr'].keys())[0], 'ip': rtr_ip, 'descr': list(self.lp['rtr'].values())[0]},
-                                                {'name': list(self.lp['vtep'].keys())[0], 'ip': vtep_ip, 'descr': list(self.lp['vtep'].values())[0],
+            self.all_lp[self.border[incr_num -1]] = [{'name': self.bse_intf['lp_fmt'] + str(self.lp['rtr']['num']), 'ip': rtr_ip, 'descr': self.lp['rtr']['descr']},
+                                                {'name': self.bse_intf['lp_fmt'] + str(self.lp['vtep']['num']), 'ip': vtep_ip, 'descr': self.lp['vtep']['descr'],
                                                 'mlag_lp_addr': mlag_ip},
-                                                {'name': list(self.lp['bgw'].keys())[0], 'ip': bgw_ip, 'descr': list(self.lp['bgw'].values())[0]}]
+                                                {'name': self.bse_intf['lp_fmt'] + str(self.lp['bgw']['num']), 'ip': bgw_ip, 'descr': self.lp['bgw']['descr']}]
             self.mlag_peer[self.border[incr_num -1]] = str(ip_network(self.addr['mlag_net'], strict=False)[int(self.border[incr_num -1][-2:]) +
                                                                       self.addr_incre['mlag_border_ip'] -1]) + '/31'
             num_bdr -= 1

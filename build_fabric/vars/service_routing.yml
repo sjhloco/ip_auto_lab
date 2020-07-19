@@ -1,250 +1,250 @@
 ###################### Service: Routing Protocols ######################
-# This supports creation of BGP peerings or non-backbone OSPF process
-# All BGP updates allowed in/out is done using Route-maps and prefix-lists
-# Redistribution of OSPF/BGP is done using Route-maps, prefix-lists and ExtCommunity lists
-# Are 3 pre-built prefix-lists that can be referenced in OSPF or BGP: ALLOW-ALL, DENY-ALL, DEFAULT
-# The OSPF process is built on a VPC pair of borders with a different area created for each pair. A new SVI is created for the RID and peering between them
-# Only creates the OSPF process, interfaces are added using the 'Device ports' service.
+# Create BGP peerings, non-backbone OSPF processes and static routes
+# Filtered and weighted redistribution is supported (connected, static, bgp, ospf) with the use of the metric
+# Keywords 'any' and 'default' can be used rather than the list of prefixes with filtering and redistribution
 
 
-# NEW INFO FOR THESE:
-# Group/ template are OS specific but a grouping of settings to apply to all peers under that group
-# timers, remote_as, allowed_in, alllowed_out, password,  switch, tenant, update_source, ebgp_multihop, next_hop_self can be done under the group/template or the peer. If both entered adds both but peer is more specific
-# Always creates a RM, but will be let as bloank (permit all) if no allowed_in or alowed_out has been specified
-# By default the group/template will use timers of 3 and 9 unless unhased and specified
-# List of switches to create this on. Specifiy under the group if the switches are the same for all peers
-# If allowed_in or allowed_out defined under the group/template uses that name in RM and PL, if defiend under peer uses that name in RM and PL
-# If not defined in any created in group/template by default
-# Mininmum that needs defineing is names (group and peer), tenant(under grp or peer), switch(under grp or peer), remote-as (under grp or peer), peer_ip (under peer)  and description (under peer)
-# inbound and outbound hold all prefix manipulation and filtering
-# If a peer or group inbound or outbound  is empty no route_map is created
-# can have allowed_in, weigh_in and pref_in. Will form a RM in order deny wiegth, pref, allow. Exceptions are ALLOW and DENY which always at end.
-# in the lists list the ACLs in order you want them to be sequenced in the prefix_list
-# Cant have same name for muliple groups or peers as the RM and PL are created from name so wont be unique
-# Can use a list of tnts, so that way the same peer can be used accross more than 1 tenant
-# Anything that can have more than 1 value must be a list, even if it is a list wiht only 1 element
+#### BGP variables ####
+# Use the group for global settings for all peers within that group, and peers for anything unique to that peer
+# The majority of the settings can be configured under group or the peer. If set in the peer that will take precedence
+# The exception to this are 'peer_ip' and 'description' which can only be set under the peer.
+# By default the group will use timers of 3 and 9 unless unhased and specified in the group or peer
 
+# Switch and tenant must be a list (even if is a single device). This is to allow for the same group and peers to be created on multiple devices
+# A group does not need to have a switch defined, it will be automatically created on any switches that peers within it are created on
 
-#### Base variables ####
+# The 'inbound' and 'outbound' dictionaries hold all prefix manipulation and filtering
+# The name of the Route-maps and prefix-list incorporate the group or peer name dependant on where applied (no duplicate group or peer names allowed)
+# 'as_path' and 'med' can be applied to outbound advertisements and 'weight' and local preference applied to those recieved inbound
+# If everything is defined (allow, deny & BGP attributes) the order in the route-map is BGP_ATTR, deny_specific, allow_specific, allow_all, deny_all
+# Inbound, outbound or redist prefixes must either be a list of prefixes or keywords 'any' or 'default'. Can use the keywords in place of the list of prefixes, however NOT within the list of prefixes
+# Prefixes can include 'ge' and/or 'le' values in the dictionary element
+
+# At a minimun the following settings need to be configured:
+# group
+# - name: string                Name of the group (used in group name and RM/PL names)
+#   switch: list                List of switches to create group and peers on, could be specified in peer (still has to be list if is only 1)
+#   tenant: list                List of tenants to create peers under, could be specified in peer (still has to be list if is only 1)
+#   peer:                      List of all the BGP peers
+#   - name: string              Name of the peer(used in RM/PL names)
+#     remote_as: integrar       Remote AS of this peer
+#     peer_ip: x.x.x.x          IP address of the peer
+#     description: string       Description of the peer
+
 svc_rtr:
   bgp:
-    groups:                                               # Group or template (OS specific) for common settings used by all peers
-      - name: INET                                          # Is used for group/ template name as well as its route amps and prefix lists
-        # These can be set in group/ template and/or in the peer
-        timers: [10,30]
-        inbound:                                   # Uses the default of 3 and 9 unless unhased and specified
-          allow: default
-        outbound:
-          med: {50: [10.20.10.0/24], 100: [10.10.10.0/24, 10.10.30.0/24]}
-          as_prepend: {1: [10.10.20.0/24], 5: [10.10.24.0/24, 10.10.14.0/24]}
-          deny: [10.50.10.0/24]
-          allow: [10.16.10.0/24]
-        peers:
-          - name: GTT
-            remote_as: 88
-            peer_ip: 1.1.1.1
-            description: GTT Internet Peering
-            tenant: [BLU, AMB]
-            # tenant: AMB
-            password: my_pa55w0rd
-            outbound:
-              allow: [201.76.1.144/28]              # The network/prefix (seperated by ,) advertised. Hash to alow all (RM permit any)
-            switch: [DC1-N9K-LEAF01]
+    group:                                          # Group/template for common settings used by all peers
+      - name: INET                                  # Is used for group name and RM/PL name
+        timers: [10,30]                             # If not defined uses  3 and 9 (can be set in group or peer)
+        switch: [DC1-N9K-LEAF01]                      # A list of either a single or multiple switches to create this group and peers on (can be set in group or peer)
+        tenant: [RED]                                 # A list of either a single or multiple VRFs to create this group and peers in (can be set in group or peer)
+        inbound:                                    # Inbound filter policies (can be set in group or peer)
+          allow: default                            # Must be a list of prefixes or string keyword of 'any' or 'default' (can be set in group or peer)
+        outbound:                                   # Outbound filter policies (can be set in group or peer)
+          med: {50: [10.20.10.0/24], 100: any}            # Dict with keys the med value and values a list of prefixes or string keyword of 'any' or 'default' (MUST be a single string, NOT within the list of prefixes)
+          as_prepend: {1: default, 5: [10.10.24.0/24]}    # Dict with keys the number of AS to add and values list of prefixes or string keyword of 'any' or 'default' (MUST be a single string, NOT within the list of prefixes)
+          deny: [10.50.10.0/24]                     # A list of prefixes or string keyword (only 'any' supported). MUST be a single string, NOT within the list of prefixes
+          allow: [10.16.10.0/24]                    # A list of prefixes or string keyword ('any' or 'default'). MUST be a single string, NOT within the list of prefixes
+        peer:
+          - name: GTT                               # Is used for RM/PL name
+            remote_as: 88                           # Can be set in group or peer
+            peer_ip: 1.1.1.1                        # Can only be set under the peer
+            description: GTT Internet Peering       # Can only be set under the peer
+            tenant: [BLU, AMB]                      # A list of single or multiple VRFs, takes precedence over what is set in group
+            password: my_pa55w0rd                   # Autehtication for this indivudal peer (can be set in group to make global for all peers)
+            outbound:                               # Takes precedence over what is set in group 'outbound' dictionary
+              allow: [21.6.12.16/28, 21.6.12.32/28]
           - name: Colt
             remote_as: 99
             peer_ip: 2.2.2.2
             description: Colt Internet Peering
-            tenant: [RED]
-            outbound:
-              allow: [21.6.12.16/28, 21.6.12.32/28]              # The network/prefix (seperated by ,) advertised. Hash to alow all (RM permit any)
-              med: {50: [11.10.10.0/24], 100: [10.11.10.0/24, 10.10.11.0/24]}
-            switch: [DC1-N9K-LEAF01]
-
       - name: iBGP
         remote_as: 65001
-        update_source: Loopback5
-        ebgp_multihop: 2
-        next_hop_self: True
-        password: my_pa55w0rd
+        update_source: Loopback5                    # Set source for BGP peers (can be set in group or peer)
+        ebgp_multihop: 2                            # Increase number of hops for a BGP peering (can be set in group or peer)
+        next_hop_self: True                         # Set next hop as self for advertised routes (can be set in group or peer)
+        default: True                               # Enable advertise default route to peers (can be set in group or peer)
+        password: my_pa55w0rd                       # Password for all BGP peerings in this group (can be set in group or peer)
         switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]
-        inbound:
-          deny: all
-        tenant: [GRN]
-        peers:
+        tenant: [AMB]
+        bfd: True                                   # Enable BFD for all BGP peers (can be set in group or peer)
+        peer:
           - name: GTT1
             remote_as: 88
             peer_ip: 192.168.55.2
             description: GTT1 Internet Peering
-            tenant: [AMB]
-            bfd: True                 # by default is off
-            default: True
             inbound:
               weight: {50: [10.11.10.0/24], 100: [10.14.10.0/24, 10.10.16.0/24]}
-              pref: {50: [10.50.10.0/24], 100: [150.150.10.0/24, 10.150.10.0/24]}
+              pref: {10: [10.50.10.0/24], 20: [150.150.10.0/24, 10.250.10.0/24]}
               deny: [10.70.10.0/24]
               allow: [10.10.170.0/24]
-        outbound:
-          med: {50: [10.170.10.0/24], 100: [10.190.10.0/24, 190.10.10.0/24]}
-          as_prepend: {1: [10.10.180.0/24], 5: [180.10.10.0/24, 10.109.10.0/24]}
-          deny: any
-          allow: default
-
       - name: DC2
-        tenant: BLU
+        tenant: [BLU]
         switch: [DC1-N9K-LEAF01]
-        bfd: True                 # by default is off
-        default: True
-        # allowed_in: [21.6.12.16/28, 21.6.12.32/28]
         inbound:
-          weight: {50: [110.10.10.0/24], 100: [102.10.10.0/24, 10.10.120.0/24], 70: any}          # Has to be any or a list
+          weight: {50: [110.10.10.0/24], 100: [102.10.10.0/24, 10.10.120.0/24], 70: any}
           pref: {50: [103.10.10.0/24], 100: [130.10.10.0/24, 10.120.10.0/24], 70: any}
           deny: any
           allow: [10.10.11.0/24]
         outbound:
           allow: any
-
-        peers:
+        peer:
           - name: DC2-N9K-LEAF01
             remote_as: 65002
             peer_ip: 192.168.77.2
             description: Inter-DC peering
+            bfd: True                           # Enable BFD for this one BGP peer (can be set in group or peer)
+            default: True
             outbound:
               med: {50: any}
-              as_prepend: {1: [10.10.130.0/24], 5: [140.10.10.0/24, 10.140.10.0/24], 7: any}
+              as_prepend: {1: [10.10.130.0/24], 5: [140.10.10.0/24, 10.140.20.0/24], 7: any}
               deny: any
 
-  # Used for VRF specific configuration sucha as network, summary and redistribution
+# Tenant holds the per-VRF specific configuration such as network, summary and redistribution
+# As with groups/peers can set switch globally for all network/summary/redist in a VRF, or overide this per prefix dict in each element
+# The summary and network 'prefix' dict takes a list as a values. Only need multiple prefix dicts if other dict elements are differernt (i.e. switch or filter)
+# Each list redistribution element is the redist type, can have ospf_xx, bgp_xx, static and connected.
+# Redistributed routes can be filtered or weighted using metric (MED in BGP)
+
     tenant:
-      - name: BLU
-        switch: [DC1-N9K-LEAF01]
-        network:                                  # If VRF and switches all the same just use list in the prefix
-          - prefix: [1.1.1.0/24, 2.2.2.0/24]
+      - name: BLU                                   # Must be a SINGLE VRF on which advertisement, summary and redistribution is configured
+        switch: [DC1-N9K-LEAF01]                      # A list of a single or muliple switches. Can be set for or all (network, summary, redist) or indvidual prefix/redist under that element (indvidual setting takes preference)
+        network:                                    # List of prefixes to be advertised (only need to have multiple if advertisements are different on different switches)
+          - prefix: [1.1.1.0/24, 2.2.2.0/24]        # Prefixes to advertised to these specific switches
             switch: [DC1-N9K-LEAF01, DC1-N9K-BORDER01]
-          - prefix: [1.1.1.0/24]
-            switch: [DC1-N9K-LEAF01]
-        summary:                                  # If VRF switches and summary_only all the same just use list in the prefix
+          - prefix: [8.8.8.0/24]                    # Prefixes to advertised to differnet switches (the switch set under tenant)
+        summary:                                    # If switches and summary_only all same for all only need the one list with multiple elements in the list of prefixes
           - prefix: [1.1.1.0/24, 2.2.2.0/24]
-            switch: [DC1-N9K-LEAF01, DC1-N9K-BORDER01]
           - prefix: [3.3.3.0/24]
-            switch: [DC1-N9K-LEAF01]
-            filter: summary_only
+            filter: summary_only                    # Advertises only teh summary, supresses any prefixes below it
           - prefix: [4.4.4.0/24]
-            switch: [DC1-N9K-LEAF01]
-        redist:
-          - type: ospf_98                          # bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
-            allow: [1.1.1.0/24]                      # Prefixes allowed, by default is any
+            switch: [DC1-N9K-BORDER01]
+        redist:                                     # A seperate list element for each redistribution type
+          - type: ospf_98                           # bgp_xxx, ospf_xxx, static, connected (has to be interface number in filter)
+            allow: [1.1.1.0/24]                     # List of Prefixes allowed
             metric: {50: [110.10.10.0/24], 100: [102.10.10.0/24, 10.10.120.0/24]}
-          - type: static                          # bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
-            # allow: [1.1.1.0/24]                      # Prefixes allowed, by default is any
-          - type: connected                          # cant use metric with this
-            allow: [ethernet1/33, ethernet1/42]
+          - type: static                            # If you dont set any allowed list all will be allowed
+          - type: connected
+            allow: [ethernet1/33, ethernet1/42]     # Connected allow is a list of interfaces rather than prefixes interfaces rather than prefixes
             switch: [DC1-N9K-BORDER01, DC1-N9K-LEAF01]
-
-
       - name: AMB
-        switch: [DC1-N9K-LEAF01]
         network:
           - prefix: [3.3.3.0/24, 4.4.4.0/24]
-            # switch: [DC1-N9K-BORDER01]
+            switch: [DC1-N9K-LEAF01]
         summary:
-          - prefix: [1.1.1.0/24, 2.2.2.0/24]
-            switch: [DC1-N9K-BORDER01]
+          - prefix: [5.5.5.0/24]
+            switch: [DC1-N9K-LEAF01]
 
-  # Passive interface is enabled by default. All OSPF interfaces are not passive unless specified
-  # default area type is normal, can use
-  # only put summaries sperate if you have different settings, (not-advertise or area), if all same use list in the one line
-# Can either specify the swithc in ospf process for all, and optionally specify in interfcae or summry to overide this
+#### OSPF variables ####
+# The switch can be defined under the process or interface, with intefrace taking precedence
+# switch and interface are a list to allow for the same OSPF process and/or interface to be defined to multiple devices and/or interfaces
+# Passive interface is enabled globally and disabled on all configured interfaces. This can be enabled on a per-interface basis
+# By default area_type is normal, define 'area_type' to chnage to stub, stub no-summary, nssa, nssa no-summary, nssa default-information-originate or nssa no-redistribution.
+
+# The summary prefix dict takes a list as a values, so only you only need lists of dicts if other dicts are differernt (swtches or filter)
+# By default it is LSA5 summary, by adding an area makes it a LSA3 summary (summarise from that area). Use not_advertise with either to filter
+# If the switch is specified (list) overides the switch setting in the process
+# Redist takes lists of prefixes or keywords 'any' or 'default'
+
+# At a minimun the following settings need to be configured:
+# - process: string or integrar               Can be a number or word
+#   tenant: string                            VRF OSPF is deployed for, all OSPF interfaces must be in this VRF
+#      switch: list                           List of switches to create OSPF process on
+#      interface:                             List interfaces in this OSPF process
+#        - name: [Vlan12]                     List of one or more interfaces with these settings (area), uses short name or vlan
+#          area: 0.0.0.0                      OSPF area that this interface is in
 
   ospf:
-    - process: 98                                     # can be a numbr or word
-      tenant: BLU
-      rid: 1.1.1.1
-      bfd: True                                   # Default is False, although need to check if BFD works on virtual, if so change to True
-      # default_orig:                          # Default is False, other options are True or Always
-      switch: [DC1-N9K-LEAF01]
+    - process: 98                                     # Can be a number or word
+      tenant: BLU                                     # VRF OSPF is deployed for
+      rid: 1.1.1.1                                    # Defining a RID is optional, if not defined will use highest IP of a loopback address
+      bfd: True                                       # Enable BFD for all OSPF neighbors (default). Can be disabled per interface by setting timers
+      default_orig: always                            # Default is False, other options are True or Always
+      switch: DC1-N9K-LEAF01                          # Can be set in group or interface,list of switches to create this OSPF process on
       interface:
-        - name: [Vlan12]                     # List or the one interface. Must start with short name or vlan
-          switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]                  # what switches it is on, can be 1 or muliple
-          area: 0.0.0.0                         # Must be in dotted decimal format
-          cost: 20                                  # interfaces opsf cost, can be 1-65535
-          authetication: password                       # add pass for auth, if added auth is enabled globally for the area
-        - name: [Vlan13]                     # List or the one interface. Must start with short name or vlan
-          switch: [DC1-N9K-LEAF01]                  # what switches it is on, can be 1 or muliple
-          area: 0.0.0.1                         # Must be in dotted decimal format
-          area_type: stub                         # default is normal, can be stub, stub no-summary, nssa, nssa no-summary. doesnt check for others in pre-val but can add default-information-originate or no-redistribution to end as whole is added to the config
-        - name: [Eth1/33]                     # List or the one interface. Must start with short name or vlan
-          switch: [DC1-N9K-LEAF01]                  # what switches it is on, can be 1 or muliple
-          area: 0.0.0.29                         # Must be in dotted decimal format
-          area_type: nssa no-summary                        # default is normal, can be stub, stub no-summary, nssa, nssa no-summary. doesnt check for others in pre-val but can add default-information-originate or no-redistribution to end as whole is added to the config
-          passive: True                            # by default is False
-          timers: [3,9]                             # Sets timers, only takes effect if BFD is False
-          type: point-to-point                      # default is braodcast
-      summary:
-        - prefix: [2.2.2.0/24, 3.3.3.0/24]
-          area: 0.0.0.29                                    #Is specified makes it a type 3, if not a type 5
-          filter: not_advertise                       # Default is False, stops it advertising so is basically filtering
-          switch: [DC1-N9K-LEAF01]
-
+        - name: [Vlan12]                              # List of one or more interfaces with these settings (area), uses short name or vlan
+          switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]    # What switches to enable these OSPF settings on, takes precedence over process setting
+          area: 0.0.0.0                               # Area must be in dotted decimal format
+          cost: 20                                    # Add if wish to change the interfaces opsf cost, can be 1-65535
+          authentication: password                     # To add authentication for the area and a password (Cisco type 7). If added authentication is enabled globally for the area so needed on all interfaces in that area
+        - name: [Vlan13]
+          switch: DC1-N9K-LEAF01
+          area: 0.0.0.1
+          area_type: stub                             # Add to change area type, default is normal. Can be stub, stub no-summary, nssa, nssa no-summary
+        - name: [Eth1/33]
+          switch: DC1-N9K-LEAF01
+          area: 0.0.0.29
+          area_type: nssa no-summary
+          passive: True                                 # By default all interfaces are False (non-passive), define to enable on a per-interface basis
+          timers: [3,9]                                 # Add to set timers, oautomatically disables BFD if enabled
+          type: point-to-point                          # By default all interfaces are broadcast
+      summary:                                          # If switches, area and filter same for all only need the one list with multiple elements in the prefix dict
+        - prefix: [2.2.2.0/24, 3.3.3.0/24]              # A list of prefixes
+          filter: not_advertise                         # By adding this stops it advertising the summary and subordinate subnets, so is basically filtering
+          switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]      # Overides the switch setting from the OSPF process
         - prefix: [4.2.2.0/24]
-          switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]
-      redist:
-        - type: bgp_65001                           #bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
-          allow: [1.1.1.0/24]                      # Prefixes allowed, by default is any
-          metric: {50: [110.10.10.0/24], 100: [102.10.10.0/24, 10.10.120.0/24]}
-        - type: static                          #bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
-          allow: [1.1.1.0/24]                      # Prefixes allowed, by default is any
-        - type: ospf_99                           #bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
-          # metric: {50: any}
-        - type: connected                          #cant use metric with this
+          area: 0.0.0.29
+      redist:                                           # A seperate list element for each redistribution type
+        - type: bgp_65001                               # bgp_xxx, ospf_xxx, static, direct (has to be interface number in filter)
+          allow: [1.1.1.0/24]                           # Prefixes allowed, by default (nothing set) is any
+          metric: {50: [110.10.10.0/24], 100: any}      # Redistributes these lists of prefixes (keywords 'any', default')  with the specified metric value
+        - type: static
+          allow: [1.1.1.0/24]                           # Prefixes allowed, by default is any
+        - type: ospf_99
+        - type: connected                               # Cant use metric with this
           allow: [ethernet1/33, ethernet1/42]
           switch: [DC1-N9K-BORDER01, DC1-N9K-LEAF01]
 
-    - process: 99                                    # can be a numbr or word
+    - process: 99
       default_orig: always
       tenant: AMB
       rid: 2.2.2.2
-      switch: [DC1-N9K-LEAF01]
+      switch: DC1-N9K-LEAF01
       interface:
-        - name: [Vlan110]                     # List or the one interface. Must start with short name or vlan                # what switches it is on, can be 1 or muliple
-          area: 0.0.0.0                         # Must be in dotted decimal format                       # default is normal, can be stub, stub no-summary, nssa, nssa no-summary. doesnt check for others in pre-val but can add default-information-originate or no-redistribution to end as whole is added to the config
-          cost: 20                                  # interfaces opsf cost, can be 1-65535
-          authetication: password           # Must be in Cisco type 7  ENCRYPTED
-          # switch: [DC1-N9K-BORDER01]
-        - name: [Vlan110]                     # List or the one interface. Must start with short name or vlan
-          switch: [DC1-N9K-BORDER01]                 # what switches it is on, can be 1 or muliple
-          area: 0.0.0.28                         # Must be in dotted decimal format
-          passive: True                            # by default is False
-          timers: [3,9]                             # Sets timers, only takes effect if BFD is False
+        - name: [Vlan110]
+          area: 0.0.0.0
+        - name: [Vlan110]
+          switch: DC1-N9K-BORDER01
+          area: 0.0.0.28
+          passive: True
+          timers: [3,9]
       summary:
         - prefix: [5.2.2.0/24]
-          area: 0.0.0.29                                    #Is specified makes it a type 3, if not a type 5
+          area: 0.0.0.29
         - prefix: [7.2.2.0/24, 8.4.3.0/24]
           filter: not_advertise
-          switch: [DC1-N9K-BORDER01]
-# A route-map is always required when redistributing routes into an OSPF instance
-# https://www.cisco.com/c/en/us/td/docs/switches/datacenter/sw/nx-os/tech_note/cisco_nxos_ios_ospf_comparison.pdf
+          switch: DC1-N9K-BORDER01
 
-  static_route:                                                 # The VRF that all the routing protocols are in
-    - tenant: [BLU]
-      switch: [DC1-N9K-LEAF01]
+#### Static route variables ####
+# Routes are added per teant, so teant is the top-level dictionary that routes are created under
+# Tenant, switch and prefix are lists to make it easy to apply the same muliple routes accross multiple devices and tenants
+# Can optionally set the interface, adminstrative distance of the route and whether the next hop is in a different VRF (for route leaking)
+
+# At a minimun the following settings need to be configured:
+# - tenant: list                List of tenants to create all routes withon
+#   switch: list                List of switches to create all routes on (alternatively can be set per-route)
+#   route:                      List of routes. For routes with same values (i.e gateway), use the one list and put all the routes in the prefix list
+#   - prefix: [10.10.10.0/24]
+#     gateway: 1.1.1.1
+
+  static_route:
+    - tenant: [BLU]                                   # List of VRFs that all the routes are in
+      switch: [DC1-N9K-LEAF01]                        # List of switches that all the routes are created on
       route:
-      - prefix: 10.10.10.0/24
-        gateway: 1.1.1.1                  #can be ip or interface
-        interface: Eth1/28
-        switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]
-      - prefix: 20.10.10.0/24
+      - prefix: [10.10.10.0/24, 10.10.20.0/24]        # List of routes thta all have same settings (gateway, interface, switch, etc)
+        gateway: 1.1.1.1                              # Next hop gateway address
+        interface: Eth1/28                            # Next hop interface
+        switch: [DC1-N9K-LEAF01, DC1-N9K-LEAF02]      # Switches to create on, overides the switch setting in the tenant
+      - prefix: [20.10.10.0/24]
         gateway: 1.1.1.1
-        ad: 10
-        next_hop_vrf: AMB                   #VRF for next-hop if different from this vrf
-      - prefix: 30.10.10.0/24
+        ad: 10                                        # Optionally set the Administraive Distance for this route
+        next_hop_vrf: AMB                             # Optionally set the VRF for next-hop if different from this vrf
+      - prefix: [30.10.10.0/24, 30.20.20.0/24, 30.30.30.0/24]
         gateway: 1.1.1.1
-      - prefix: 40.10.10.0/24
-        gateway: 1.1.1.
-        ad: 20
         switch: [DC1-N9K-BORDER01]
-    - tenant: [AMB, GRN]              # can have a  list of tenants
+    - tenant: [AMB, GRN]
       route:
-      - prefix: 50.10.10.0/24
+      - prefix: [50.10.10.0/24]
         gateway: 2.1.1.1
         ad: 30
         switch: [DC1-N9K-LEAF01]
@@ -253,41 +253,21 @@ svc_rtr:
 #### Advanced variables ####
   adv:
     bgp:
-      timers: [3, 9]
-      naming:
-        rm_in: RM_name_IN                          # Naming format, name is swapped with bgp peering name. Can change but MUST still have 'name' in it
-        rm_out: RM_name_OUT                        # Naming format, name is swapped with bgp peering name. Can change but MUST still have 'name' in it
-        pl_in: PL_name_IN                          # Only created if dont use ALLOW-ALL, DENY-ALL or DEFAULT
-        pl_out: PL_name_OUT                        # Only created if dont use ALLOW-ALL, DENY-ALL or DEFAULT
-        pl_wght_in: PL_name_WGHTval_IN
-        pl_pref_in: PL_name_PREFval_IN
-        pl_med_out: PL_name_MEDval_OUT
-        pl_aspath_out: PL_name_AS+val_OUT
-        pl_deny: PL_DENY_ALL
-        pl_allow: PL_ALLOW_ALL
-        pl_default: PL_DEFAULT
-    redist:
-      rm_name: RM_src_to_dst                        # src and dst will be swapped so are needed, all else can be edited.
-      pl_name: PL_src_to_dst                        # src and dst will be swapped so are needed, all else can be edited
-      pl_metric_name: PL_src_to_dst_MEval
-
-
-
-  #   rm_in_naming: rm_BGPas>>OSPFpro                 # Naming format, 'as' is swapped for the BGP AS and 'pro' for OSPF process. Can change but MUST still have 'pro' and 'as' in it
-  #   rm_out_naming: rm_OSPFpro>>BGPas                # Naming format, 'pro' is swapped for OSPF process and 'as' for the BGP AS. Can change but MUST still have 'pro' and 'as' in it
-  #   cl_in_naming: cl_RT_vrf                         # Extcommity list that matches RT for that tenant (BGPAS:L3VNI), is the SVIs redist into IPv4 address family. 'vrf is subsituted for vrf
-  #   pl_out_naming: pl_OSPFpro>>BGPas                # Only created if dont use ALLOW-ALL, DENY-ALL or DEFAULT, it again swaps 'pro' and 'as'
-
-
-# route-map RM_OSPF98_to_BGP65001 permit 10
-# route-map RM_OSPF98_to_BGP65001 permit 20
-# route-map RM_OSPF98_to_BGP65001 permit 30
-# route-map RM_OSPF98_to_OSPF99 permit 10
-# route-map RM_CONN_to_OSPF98 permit 0
-# route-map RM_OSPF98_to_STATIC permit 10
-
-# route-map RM_ospf98_to_static permit 10
-# route-map RM_CONN>>BGP65001_BLU permit 10
-# route-map RM_CONN>>BGP65001_GRN permit 10
-
-# swap src & dst
+      timers: [3, 9]                                # Default timers used by BGP groups for all peers
+      naming:                                       # Naming of prefix-lists and Route-maps used by bgp
+        rm_in: RM_name_IN                           # Route-map Inbound: Can change but MUST contain 'name' as is replaced by the bgp group or peer name
+        rm_out: RM_name_OUT                         # Route-map Outbound: Can change but MUST contain 'name' as is replaced by the bgp group or peer name
+        pl_in: PL_name_IN                           # Prefix-list Inbound: Only create if dont use 'pl_deny', pl_allow' or pl_default'
+        pl_out: PL_name_OUT                         # Prefix-list Outbound: Only create if dont use 'pl_deny', pl_allow' or pl_default'
+        pl_wght_in: PL_name_WGHTval_IN              # Prefix-list for weight (Inbound): Can change but MUST contain 'name' and 'val', which is swapped for the weight value
+        pl_pref_in: PL_name_PREFval_IN              # Prefix-list for local Pref (Inbound): Can change but MUST contain 'name' and 'val', is swapped for the local pref value
+        pl_med_out: PL_name_MEDval_OUT              # Prefix-list for MED (Outbound): Can change but MUST contain 'name' and 'val', is swapped for the metric value
+        pl_aspath_out: PL_name_AS+val_OUT           # Prefix-list for ASPath prepend(Outbound): Can change but MUST contain 'name' and 'val', is swapped for number of times AS is added
+    dflt_pl:                                        # Predefined PLs that are used for allow/deny filtering and redist when 'any' and 'defau;t keywords used. Not used with BGP_ATTR or Metric as needs unique PL name
+        pl_deny: PL_DENY_ALL                        # Prefix-list used in any route-map when all traffic is denied ('any' keyword under deny)
+        pl_allow: PL_ALLOW_ALL                      # Prefix-list used in any route-map when all traffic is allowed ('any' keyword under allow)
+        pl_default: PL_DEFAULT                      # Prefix-list used in any route-map when default route is matched ('default' keyword under allow)
+    redist:                                         # Naming of prefix-lists and Route-maps used by bgp
+      rm_name: RM_src_to_dst                        # Name can be chanegd but MUST contain 'src' and 'dst' as are swapped to the source and destination of the redistribution
+      pl_name: PL_src_to_dst                        # Name can be chanegd but MUST contain 'src' and 'dst' as are swapped to the source and destination of the redistribution
+      pl_metric_name: PL_src_to_dst_MEval           # Also adds the Metric value used. Name can be chanegd but MUST contain 'src', 'dst' and 'val'

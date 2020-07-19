@@ -9,15 +9,16 @@
 # -stp_trunk_non_ba: Same as stp_trunk but sets STP will be set to 'normal' for devices that dont support BA
 # -non_stp_trunk: A L2 trunk port going to a device that doesnt support BPDU. STP set to 'edge' and BPDU Guard enabled
 # -layer3: A non-switchport L3 interface with an IP address
+# -loopback: loopback address, as per layer3 is defined
 
 # Interfaces are defined as a dictionary value for the single_homed or dual-homed key.
 # At a minimun the following settings need to be configured:
-# - single_homed: or dual-homed:
+# single_homed: or dual-homed:
 #  - descr: string
-#  - type: access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3
-#  - ip_vlan: vlan or ip            Depends on the type, either ip/prefifx, vlan or multiple vlans separated by ,
-#  - switch: name                   Name of switch to create on. If dual-homed needs to be odd switch number from MLAG pair
-#  - tenant: name                   Layer3 interfaces only, is the VRF the interface will be in*
+#    type: access, stp_trunk, stp_trunk_non_ba, non_stp_trunk or layer3
+#    ip_vlan: vlan or ip            Depends on the type, either ip/prefifx, vlan or multiple vlans separated by ,
+#    switch: name                   Name of switch to create on. If dual-homed needs to be odd switch number from MLAG pair
+#    tenant: name                   Layer3 interfaces only, is the VRF the interface will be in*
 
 # To statically assign the interface and/or port-channel number (default is dynamically from a range) add either of these 2 extra dictionaries to the interface.
 # The values used can overlap with the dynamic interface range however for simplicty would advise to use a separate range for dynamic and static assignments.
@@ -62,6 +63,22 @@ svc_intf:
         ip_vlan: 10.100.100.25/30
         switch: [DC1-N9K-LEAF01]
         intf_num: 42
+      - descr: LP > MCAST RP
+        type: loopback
+        tenant: BLU
+        ip_vlan: 5.5.5.5/32
+        switch: [DC1-N9K-LEAF01]
+        intf_num: 42
+      - descr: LP > MCAST RP
+        type: loopback
+        tenant: BLU
+        ip_vlan: 6.6.6.6/32
+        switch: [DC1-N9K-LEAF01]
+        intf_num: 11
+      - descr: LP > MCAST PIM
+        type: loopback
+        ip_vlan: 7.7.7.7/32
+        switch: [DC1-N9K-LEAF01]
 
     dual_homed:
       - descr: ACCESS > DC1-SRV-PRD01 eth1
@@ -100,6 +117,8 @@ svc_intf:
     single_homed:                   # Used only for single-homed devices
       first_intf: 33                # First interface
       last_intf: 40                 # Last interface
+      first_lp: 11                  # First loopback interface
+      last_lp: 20                   # Last loopback interface
     dual_homed:                     # Used only for dual-homed devices
         first_intf: 13              # First interface
         last_intf: 32               # Last interface

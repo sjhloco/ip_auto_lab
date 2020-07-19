@@ -2,9 +2,9 @@
 
 
 {### Create all the Prefix-lists ###}
-ip prefix-list {{ svc_rtr.adv.bgp.naming.pl_allow }} seq 5 permit 0.0.0.0/0 le 32
-ip prefix-list {{ svc_rtr.adv.bgp.naming.pl_default }} seq 5 permit 0.0.0.0/0
-ip prefix-list {{ svc_rtr.adv.bgp.naming.pl_deny }} seq 5 deny 0.0.0.0/0 le 32
+ip prefix-list {{ svc_rtr.adv.dflt_pl.pl_allow }} seq 5 permit 0.0.0.0/0 le 32
+ip prefix-list {{ svc_rtr.adv.dflt_pl.pl_default }} seq 5 permit 0.0.0.0/0
+ip prefix-list {{ svc_rtr.adv.dflt_pl.pl_deny }} seq 5 deny 0.0.0.0/0 le 32
 {% for pfx in flt_svc_rtr[0] %}
 ip prefix-list {{ pfx[0] }} seq {{ pfx[1] }} {{ pfx[2] }} {{ pfx[3] }}
 {% endfor %}
@@ -139,15 +139,15 @@ router ospf {{ ospf_proc }}
 interface {{ intf }}
 {% if ospf_cfg.type is defined %}
   medium p2p
-{% endif %}{% if ospf_cfg.authetication is defined %}
-  ip ospf message-digest-key 1 md5 3 {{ ospf_cfg.authetication }}
+{% endif %}{% if ospf_cfg.authentication is defined %}
+  ip ospf message-digest-key 1 md5 3 {{ ospf_cfg.authentication }}
 {% endif %}{% if ospf_cfg.cost is defined %}
   ip ospf cost {{ ospf_cfg.cost }}
 {% endif %}{% if ospf_cfg.timers is defined %}
   ip ospf bfd disable
   ip ospf hello-interval {{ ospf_cfg.timers[0] }}
   ip ospf dead-interval {{ ospf_cfg.timers[1] }}
-{% endif %}{% if ospf_cfg.passive is defined %}
+{% endif %}{% if ospf_cfg.passive is not defined %}
   no ip ospf passive-interface
 {% endif %}
   ip router ospf {{ ospf_cfg.proc }} area {{ ospf_cfg.area }}
@@ -156,9 +156,9 @@ interface {{ intf }}
 {### Create the static routes ###}
 {% for vrf, route in flt_svc_rtr[7].items() %}
 vrf context {{ vrf }}
-{% for each_rte in route %}
+{% for each_rte in route %}{% for each_pfx in each_rte.prefix %}
 {% if each_rte.next_hop_vrf is defined %}
-  ip route {{ each_rte.prefix }} {{ each_rte.interface }} {{ each_rte.gateway }}  vrf {{ each_rte.next_hop_vrf }} {{ each_rte.ad }}
+  ip route {{ each_pfx }} {{ each_rte.interface }} {{ each_rte.gateway }}  vrf {{ each_rte.next_hop_vrf }} {{ each_rte.ad }}
 {% else %}
-  ip route {{ each_rte.prefix }} {{ each_rte.interface }} {{ each_rte.gateway }} {{ each_rte.ad }}
-{% endif %}{% endfor %}{% endfor %}
+  ip route {{ each_pfx }} {{ each_rte.interface }} {{ each_rte.gateway }} {{ each_rte.ad }}
+{% endif %}{% endfor %}{% endfor %}{% endfor %}

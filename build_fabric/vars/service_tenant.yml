@@ -5,17 +5,17 @@
 # Even if it is not a L3_tenant still creates VRF and reserves the L3VNI/VLAN (stops renumbering if made L3_tenant in the future)
 
 # At a minimun per-tenant you need:
-#     - tenant_name: Name                     Name of the VRF
-#       l3_tenant: True or False              Does it need SVIs or is routing done on a device external to the L&S fabric (i.e router)
-#       vlans:                                VLANs within this tenant
-#         - num: Number                       VLAN number
-#           name: Name                        VLAN Name
+# - tenant_name: Name                     Name of the VRF
+#   l3_tenant: True or False              Does it need SVIs or is routing done on a device external to the L&S fabric (i.e router)
+#   vlans:                                VLANs within this tenant
+#   - num: Number                       VLAN number
+#     name: Name                        VLAN Name
 
 # These settings are optional and need not be set. Setting them overides the explicit default values
-#           ip_addr: x.x.x.x/24               Adding an IP address makes it a L3 VLAN (default L2 only)
-#           ipv4_bgp_redist: True or False    Whether thhe SVI is redistributed into IPv4 BGP addr-fam (default True unless no ip_addr in which case is False)
-#           create_on_leaf: True or False     Whether this VLAN is created on the leafs (default True)
-#           create_on_border: True or False   Whether this VLAN is created on the borders (default False)
+#     ip_addr: x.x.x.x/24               Adding an IP address makes it a L3 VLAN (default L2 only)
+#     ipv4_bgp_redist: True or False    Whether thhe SVI is redistributed into IPv4 BGP addr-fam (default True unless no ip_addr in which case is False)
+#     create_on_leaf: True or False     Whether this VLAN is created on the leafs (default True)
+#     create_on_border: True or False   Whether this VLAN is created on the borders (default False)
 
 #### Base variables ####
 svc_tnt:

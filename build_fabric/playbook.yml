@@ -2,8 +2,8 @@
 # This playbook is used to to deploy leaf and spine topology
 
 - name: "Deploy Leaf and Spine DC"
-  # hosts: all
-  hosts: DC1-N9K-LEAF01:DC1-N9K-LEAF04
+  hosts: all
+  # hosts: DC1-N9K-LEAF01
   # hosts: DC1-N9K-BORDER02
   # hosts: DC1-N9K-LEAF01:DC1-N9K-LEAF02
   # hosts: DC1-N9K-SPINE02
