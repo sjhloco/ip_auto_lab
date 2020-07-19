@@ -1,29 +1,50 @@
 I change ec_fmt in fabric.yml from Port-channel to port-channel, need to keep inmind incase thigns start failing
 
--Interfaces - need to chaneg trunks to lists if more than 1 -  must be a list or integrar !!!!!!
-INTERFACES: need to be able to create loopbacks
+
+INTERFACES: need to be able to create loopbacks - JUST NEED TO INCLUDE IF IN DEFAULT VRF
+
+Loopback must be /32
+reserved range is 11 to 20
+If not teannt set for any needs to be put in default
 
 
+TRY -> on nexus, should be waht using for redist
 
++POST_VAL to fix=
+post-val for new loopback interface variabel setup (bse)
+New lp_fmt to be tested for
+Make surw that interface ranges dont conflict with fbric LOOPBACKS OR interfaces
+itnerface tenant can be nothing and then is default
+interfaces in service interface are now a list
+loopback ip must be /32
+
+RTR post-val
+no duplicate group or peer names
+cant have same prefix in a prefix-list (duplicate preofx in same prefix-list)
+BGP tenant has to be s single device, or a list of multiple devices (cant be muliple devices not in a list)
+(no duplicate group or peer names allowed)
+ 'as_path' and 'med' can be applied to outbound advertisements and 'weight' and local preference applied to those recieved inbound
+prefix always must be a list,even if only 1 element.
+BGP deny does not accept the default  keywork, all others do
+Cant have host address (/32) on a normal intefrcaes
+OSPF  interfaces in same OSPF process
+
+RTR-
+TEST: If minimun values for BGP peer are correct
 BFD_routing: Whetehr is default dicated by whether virtual supports it
 
+
+Need to check what did with allow, dney and default and update info in variabel file
+-Do all take them? Did I used deny?
 
 
 Add to notes about removing dict elements if doen exist (use pop rahter than del)
 https://stackoverflow.com/questions/11277432/how-to-remove-a-key-from-a-python-dictionary
 
 
-ROUTING: - decide about if all are liss or not
-1. Add network/ summary to templates  - Done, although maybe join to tenants to peers if possible
 
-2. Add switch to summary and redist for OSPF - DONE
-3. Fix redist for OSPF - DONE - BUG
-add blank rm if no metric or allow specified    DONE
 
-3. Add redist for BGP
-4. add static routes
-
-pre-checks  - cant have same prefix in a prefix-list (duplicate preofx in same prefix-list)
+pre-checks  -
 
 
 
@@ -45,6 +66,8 @@ BGP65001]/ent-10/mrtdst/rsrtDstAtt-[sys/rpm/pfxlistv4-[PL_OSPF98>>BGP65001_ME50]
 
 
 
+
+ADD TO LIST?DICT NOTES
 POP dictionary - use when want to delte a key, but may not exist (similart to how used get() and setdefault())
 
 
@@ -53,3 +76,6 @@ If the specified key is not present, it throws an error KeyError.
 
 TO get round this use this. If the key is is not present, the specified value (None) value is returned.
 intf.pop('name', None)
+
+To delete multiple dicts in one line:
+del grp['switch'], grp['peer'], grp['tenant']
