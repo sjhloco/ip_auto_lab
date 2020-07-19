@@ -151,7 +151,7 @@ These core elements are the minimum requirements to create the declarative fabri
 
 ## Services - Tenant Variables *(svc_tnt)*
 
-Tenants, SVIs, VLANs and VXLANs are entered based on the variables stored in the *services_tenant.yml* file (*svc_tnt.tnt*). 
+Tenants, SVIs, VLANs and VXLANs are created based on the variables stored in the *service_tenant.yml* file (*svc_tnt.tnt*). 
 
 | Key      | Value | Information                                                                    |
 |----------------|-------|------------------------------------------------------------------------------|
@@ -261,7 +261,7 @@ An example of a data model created by the *svc_tnt_dm* method within the *format
 ```
 
 ## Services - Interface Variables *(svc_intf)*
-Interfaces are configured based on the variables specified in the *services_interfaces.yml* file. They can be single or dual-homed with the interface and port-channel number either entered manually or dynamically chosen from a range. All key values are a string or integer except for *switch* which is a list to allow for provisioning of an interface across multiple devices.
+Interfaces are configured based on the variables specified in the *service_interface.yml* file. They can be single or dual-homed with the interface and port-channel number either entered manually or dynamically chosen from a range. All key values are a string or integer except for *switch* which is a list to allow for provisioning of an interface across multiple devices.
 
 By default all interfaces are *dual-homed* with an LACP state of 'active'. The interface details only need to be defined for the odd numbered switch, configuration for both members for the MLAG pair is automatically generated.  
 The VPC number can not be changed, it will always be the same as the port-channel number.
@@ -309,7 +309,7 @@ To statically assign the interface and/or port-channel number (default is dynami
 | first_po | `integrar` | *First port-channel number to be dynamically used*
 | last_po | `integrar` | *Last port-channel numberto be dynamically used*
 
-From the values in the *services_interface.yml* file a new per-device data model is created by the *svc_intf_dm* method within the *format_dm.py* custom filter plugin. An example of the data model is shown below:
+From the values in the *service_interface.yml* file a new per-device data model is created by the *svc_intf_dm* method within the *format_dm.py* custom filter plugin. An example of the data model is shown below:
 ```json
 {
     "descr": "L3 > DC1-SRV-MON01 nic1",
@@ -343,6 +343,227 @@ From the values in the *services_interface.yml* file a new per-device data model
 The interface cleanup role is required to make sure any interfaces not assigned by the fabric or the services (svc_intf) role have a default configuration. Without this if an interface was to be changed (for example a server moved to different interface) the old interface would not have its configuration put back to the default values.
 
 This role goes through the interfaces assigned by the fabric (from the invetory) and service_interface role (from the svc_intf_dm method) producing a list of used physical interfaces which are then subtracted from the list of all the switches physical interfaces (*fbc.num_intf*). It has to be run after the fabric or service_interface role as it needs to know what interfaces have been assigned, therefore uses tags to ensure it is run anytime either of these roles are run.
+
+## Services - Routing Variables *(svc_rtr)*
+BGP peerings, non-backbone OSPF processes, static routes and redistribution (connected, static, bgp, ospf) are configured based on the variables specified in the service_routing.yml file. I am undecided about this role as it is difficult to keep it simple due to all the nerd knobs in routing protocols, especially BGP. 
+
+### BGP
+Uses the concept of groups and peers with inheritance. The majority of settings can either be configured under group or the peer, with those configured under the peer taking precedence.  
+The *switch* and *tenant* settings must be a list (even if is a single device) to allow for the same group and peers to be created on multiple devices and tenants.
+At a bare minimun only the mandatory settings are required to form BGP peerings, all others settings are optional.
+
+***bgp.group:*** List of groups that hold global settings for all peers within that group. This table shows settings that can ONLY be configured under the group. A group does not need to have a switch defined, it will be automatically created on any switches that peers within it are created on.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` | Yes | *Name of the group, no duplicate group or peer names are allowed. It is used in group, route-map and prefix-list names
+
+***grp.group.peer:*** List of peers within the group that will inherit non-configured settings from that group. This table shows settings that can ONLY be configured under the peer.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` |  Yes | *Name of the peer, no duplicate group or peer names are allowed. It is used in route-map and prefix-list names*
+| peer_ip | x.x.x.x |  Yes | *IP address of the peer*
+| description| `string` |  Yes | *Description of the peer*
+
+***grp*** or ***peer:*** These settings can be configured under the group, the peer, or both. The native OS handles the duplication of settings (between group and peers) and the hierarchy (peer settings taking precedence). For any of the non-mandatory settings the dictionary only needs to be included if that settings is to be configured.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| switch | `list` |  Yes | *List of switches to create the group and peers on. Has to be list even if is only 1*
+| tenant | `list` |  Yes | *List of tenants to create the peers under. Has to be list even if is only 1*
+| remote_as | `integrar` | Yes | *Remote AS of this peer or if set under the group all peers within that group*
+| timers | [keepalives, holdtime] | No | *If not defined uses keepalive of 3 and holdtime of 9 seconds. Default timers are set in the group*
+| bfd | `True` | No | *Enable BFD for an indivdual peer or all peers in the group. By default is disabled globally*
+| password | `string` | No | *Authentication for an indivdual peer or all peers in the group. By default no password set*
+| default | `True` | No | *Enable advertisement of the default route to an indivdual peer or all peers in the group. By default not set*
+| update_source | `string` | No | *Set the source interface for BGP peers. By default it is not set*
+| ebgp_multihop | `integrar` | No | *Increase the number of hops for BGP peerings. By default it is set to 1*
+| next_hop_self | `True` | No | *Set the next hop to itself for any advertised prefixes. By default it is not set*
+
+***inbound*** or ***outbound:*** These two dictionaires can be set under the group or peers and hold the settings for prefix BGP attribute manipulation and filtering. Dependant on where this is applied the route-maps and prefix-lists incorporate the group or peer name. If everything is defined the order in the route-map is *BGP_ATTR*, *deny_specific*, *allow_specific*, *allow_all*, *deny_all*.
+They take either a list of prefixes (can include 'ge' and/or 'le' in the element) or the single special keyword string ('any' or 'default'). This MUST be a single string, NOT within the list of prefixes.
+
+| Key      | Value | Direction |Information |
+|----------|-------|-------|-------------|
+| weight | `dict` | inbound | *The keys are the weight and the value a list of prefixes or keywords ('any' or 'default')*
+| pref | `dict` | inbound | *The keys are the local preference and the value a list of prefixes or keywords ('any' or 'default')*
+| med | `dict` | outbound | *The keys are the med value and the values a list of prefixes or keywords ('any' or 'default')*
+| as_prepend | `dict` | outbound | *The Keys are the number of times to add the ASN and the values a list of prefixes or keywords ('any' or 'default')*
+| allow | `list`, any, default | both | *Can be a list of prefixes or special keywords to advertise 'any' or just the default route*
+| deny | `list`, any | both | *Can be a list of prefixes or special 'any' keyword to advertise nothing*
+
+***bgp.tenant:*** List of VRFs to advertise networks, summarization and redistribution. The tenant dictionary is not mandadatory, it is only needed if any of these advertisemnt methods is being used. The *switch* can set globally for all network/summary/redist in a VRF or be overidden on per-prefix basis. As per the inbound/outbound dictionaries 'any' and 'default' keywords can be used rather than the list of prefixes for the *allow* dictionary or the value of the *metric* dictionary.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` | Yes | *Must be a single VRF on which the advertisement (network), summary and redistribution is configured*
+| switch | `list` | Yes (in here or element) | *List of a single or multiple switches. Can be set for all (network, summary, redist) or indvidual prefix/redist*
+
+***bgp.tenant.network:*** List of prefixes to be advertised. Only need to have multiple lists of prefixes if the advertisents are different for different switches, otherwise all the prefixes can be in the one list of the prefix dictionary.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List of prefixes to advertised to all switches set under tenant or this list of specific switches*
+| switch | `list` | Yes (in here or element) | *List of switches to advertise these prefixes to*
+
+***bgp.tenant.summary:*** List of summarizations. If the *switch* and *summary_only* elements are the same for all prefixes only need the one list element and list all the summarizations in the one list of the prefix dictionary.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List sumarizations to apply on all switches set under tenant or this list of specific switches*
+| filter | summary_only | No |*Add this dictionary to only advertise the summary and supresses any prefixes below it (disabled by default)*
+| switch | `list` | Yes (in here or element) | *List of switches to apply sumarization on*
+
+***bgp.tenant.redist:*** Each redistribution list element is the redistribution type, can be *ospf_xx*, *static* or *connected*. Redistributed prefixes can be filtered (*allow*) or weighted (*metric*) with the route-map order being *metric* and then *allow*. If the allow list is not set it will allow any (empty route-map).
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| type | `string` | Yes | *What is to be redistrbuted into BGP. Can be ospf_xxx, static or connected*
+| metric | `dict` | No | *The keys are the med value and the values a list of prefixes or keyword ('any' or 'default'). Cant use with metric with connected*
+| allow | `list`, any, default | No | *List of prefixes (if connected list of interfaces) or keyword ('any' or 'default') to redistribute*
+| switch | `list` | Yes (in here or element) | *List of switches to apply redistribution on*
+
+## Services - Routing Variables *(svc_rte)*
+BGP peerings, non-backbone OSPF processes, static routes and redistribution (connected, static, bgp, ospf) are configured based on the variables specified in the service_routing.yml file. I am undecided about this role as it is difficult to keep it simple due to all the nerd knobs in routing protocols, especially BGP. 
+
+### BGP
+Uses the concept of groups and peers with inheritance. The majority of settings can either be configured under group or the peer, with those configured under the peer taking precedence.  
+The *switch* and *tenant* settings must be a list (even if is a single device) to allow for the same group and peers to be created on multiple devices and tenants.
+At a bare minimun only the mandatory settings are required to form BGP peerings, all others settings are optional.
+
+***bgp.group:*** List of groups that hold global settings for all peers within that group. This table shows settings that can ONLY be configured under the group. A group does not need to have a switch defined, it will be automatically created on any switches that peers within it are created on.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` | Yes | *Name of the group, no duplicate group or peer names are allowed. It is used in group, route-map and prefix-list names
+
+***grp.group.peer:*** List of peers within the group that will inherit non-configured settings from that group. This table shows settings that can ONLY be configured under the peer.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` |  Yes | *Name of the peer, no duplicate group or peer names are allowed. It is used in route-map and prefix-list names*
+| peer_ip | x.x.x.x |  Yes | *IP address of the peer*
+| description| `string` |  Yes | *Description of the peer*
+
+***grp*** or ***peer:*** These settings can be configured under the group, the peer, or both. The native OS handles the duplication of settings (between group and peers) and the hierarchy (peer settings taking precedence). For any of the non-mandatory settings the dictionary only needs to be included if that settings is to be configured.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| switch | `list` |  Yes | *List of switches to create the group and peers on. Has to be list even if is only 1*
+| tenant | `list` |  Yes | *List of tenants to create the peers under. Has to be list even if is only 1*
+| remote_as | `integrar` | Yes | *Remote AS of this peer or if set under the group all peers within that group*
+| timers | [keepalives, holdtime] | No | *If not defined uses keepalive of 3 and holdtime of 9 seconds. Default timers are set in the group*
+| bfd | `True` | No | *Enable BFD for an indivdual peer or all peers in the group. By default is disabled globally*
+| password | `string` | No | *Authentication for an indivdual peer or all peers in the group. By default no password set*
+| default | `True` | No | *Enable advertisement of the default route to an indivdual peer or all peers in the group. By default not set*
+| update_source | `string` | No | *Set the source interface for BGP peers. By default it is not set*
+| ebgp_multihop | `integrar` | No | *Increase the number of hops for BGP peerings. By default it is set to 1*
+| next_hop_self | `True` | No | *Set the next hop to itself for any advertised prefixes. By default it is not set*
+
+***inbound*** or ***outbound:*** These two dictionaires can be set under the group or peers and hold the settings for prefix BGP attribute manipulation and filtering. Dependant on where this is applied the route-maps and prefix-lists incorporate the group or peer name. If everything is defined the order in the route-map is *BGP_ATTR*, *deny_specific*, *allow_specific*, *allow_all*, *deny_all*.
+They take either a list of prefixes (can include 'ge' and/or 'le' in the element) or the single special keyword string ('any' or 'default'). This MUST be a single string, NOT within the list of prefixes.
+
+| Key      | Value | Direction |Information |
+|----------|-------|-------|-------------|
+| weight | `dict` | inbound | *The keys are the weight and the value a list of prefixes or keywords ('any' or 'default')*
+| pref | `dict` | inbound | *The keys are the local preference and the value a list of prefixes or keywords ('any' or 'default')*
+| med | `dict` | outbound | *The keys are the med value and the values a list of prefixes or keywords ('any' or 'default')*
+| as_prepend | `dict` | outbound | *The Keys are the number of times to add the ASN and the values a list of prefixes or keywords ('any' or 'default')*
+| allow | `list`, any, default | both | *Can be a list of prefixes or special keywords to advertise 'any' or just the default route*
+| deny | `list`, any | both | *Can be a list of prefixes or special 'any' keyword to advertise nothing*
+
+***bgp.tenant:*** List of VRFs to advertise networks, summarization and redistribution. The tenant dictionary is not mandadatory, it is only needed if any of these advertisemnt methods is being used. The *switch* can set globally for all network/summary/redist in a VRF or be overidden on per-prefix basis. As per the inbound/outbound dictionaries 'any' and 'default' keywords can be used rather than the list of prefixes for the *allow* dictionary or the value of the *metric* dictionary.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `string` | Yes | *Must be a single VRF on which the advertisement (network), summary and redistribution is configured*
+| switch | `list` | Yes (in here or element) | *List of a single or multiple switches. Can be set for all (network, summary, redist) or indvidual prefix/redist*
+
+***bgp.tenant.network:*** List of prefixes to be advertised. Only need to have multiple lists of prefixes if the advertisents are different for different switches, otherwise all the prefixes can be in the one list of the prefix dictionary.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List of prefixes to advertised to all switches set under tenant or this list of specific switches*
+| switch | `list` | Yes (in here or element) | *List of switches to advertise these prefixes to*
+
+***bgp.tenant.summary:*** List of summarizations. If the *switch* and *summary_only* elements are the same for all prefixes only need the one list element and list all the summarizations in the one list of the prefix dictionary.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List sumarizations to apply on all switches set under tenant or this list of specific switches*
+| filter | summary_only | No |*Add this dictionary to only advertise the summary and supresses any prefixes below it (disabled by default)*
+| switch | `list` | Yes (in here or element) | *List of switches to apply sumarization on*
+
+***bgp.tenant.redist:*** Each redistribution list element is the redisttibution type, can be *ospf_xx*, *static* or *connected*. Redistributed prefixes can be filtered (*allow*) or weighted (*metric*) with the route-map order being *metric* and then *allow*. If the allow list is not set it will allow any (empty route-map).
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| type | `string` | Yes | *What is to be redistrbuted into BGP. Can be ospf_xxx, static or connected*
+| metric | `dict` | No | *The keys are the med value and the values a list of prefixes or keyword ('any' or 'default'). Cant use with metric*
+| allow | `list`, any, default | No | *List of prefixes (if connected list of interfaces) or keyword ('any' or 'default') to redistribute*
+| switch | `list` | Yes (in here or element) | *List of switches to apply redistribution on*
+
+### OSPF
+A list of non-backbone OSPF processes which have further nested dictionaries of OSPF interfaces, summarization and redistribution. The list of switches that the OSPF process is configured on can be defined under the main process, any of the nested dictionaires, or both. Nested dictionary configuration takes precedence.
+At a bare minimun only the mandatory settings are needed, all others settings are optional.
+
+***ospf:*** List of non-backbone OSPF processes and the global settings for each process.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| process | `integrar` or `string` | Yes | *Can be a number or word*
+| tenant | `string` | Yes | *VRF this OSPF process is deployed in*
+| rid | x.x.x.x | No | *Router-ID for this OSPF process. If not defined will use highest IP of a loopback address*
+| bfd | `True` | No | *Enable BFD for all OSPF neighbors. Once enabled can be disabled on a per-interface basis by setting OSPF timers*
+| default_orig | `True` or always | No | *By default is disabled, options are enabled (True) or Always (send even if no default route in routing table)*
+| switch | `list` | Yes (in here or nested dicts) | *List of switches to create OSPF process on, applies to all nested dictionaries unless also defined in those*
+
+***ospf.interface:*** List of OSPF interfaces and the settings. Each list element is a group of interfaces with the same group of settings (same area number, same interface type, etc).
+*passive-interface* is enabled globally and automatially disabled on all configured interfaces. This can be enabled on a per-interface basis.
+If authentication is enabled for an interface it is enabled globally for that area so the same dictionary setting (*password*) is needed on all interfaces in that area.
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| name | `list` | Yes | List of one or more interfaces which have these same settings. Use interface short name (*Eth*) or *Vlan*
+| area | x.x.x.x | Yes | *Area this group of interfaces are in, must be in dotted decimal format*
+| cost | `integrar` | No | *To statically set the interfaces OSPF cost, can be 1-65535*
+| authentication | `string` | No | *Enables authentication for the area and a password (Cisco type 7) for this interface*
+| area_type | `string` | No | *Can be stub, nssa, stub/nssa no-summary, nssa default-information-originate or nssa no-redistribution*
+| passive | `True` or `False` | No | *Make the interface passive so it wont form OSPF peers. By default all interfaces are False (non-passive)*
+| timers | [hello, holdtime] | No | *Set the hellow and deadtime timers (10/40). If BFD is enabled globally BFD will be disabled for this interface*
+| type | broadcast or point-to-point| No | *By default all interfaces are broadcast. All interfaces in the same area must be of the same type*
+| switch | `list` | Yes (in here or process) | *What switches to enable these OSPF interfaces on, takes precedence over process switch setting*
+
+***ospf.summary:*** List of summarizations. If the *switch*, *filter* and *area* dictionaries are the same for all prefixes only need the one list with all the summaries in that list of the prefix dictionary. 
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List of sumarizations to apply on all switches set under the process or this list of specific switches*
+| area | x.x.x.x | No | *By default it is a LSA5 summary, by adding an area it makes it a LSA3 summary (summarise from that area)*
+| filter | not_advertise | No | *Stops it advertising the summary and subordinate subnets, is basically filtering*
+| switch | `list` | Yes (in here or process) | *What switches to enable these sumarizations, takes precedence over process switch setting*
+
+***ospf.redist:***: Each redistribution list element is the redistribution type, can be ospf_xx, bgp_xx, static or connected. Redistributed prefixes can be filtered (allow) or weighted (metric) with the route-map order being metric and then allow. If the allow list is not set it will allow any (empty route-map).
+
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| type | `string` | Yes | *What is to be redistrbuted into this OSPF process, bgp_xx, ospf_xxx, static or connected*
+| metric | `dict` | No | *The keys are the med value and the values a list of prefixes or keyword (‘any’ or ‘default’). Cant use with metric connected*
+| allow | `list`, any, default | No | *List of prefixes (if connected list of interfaces) or keyword (‘any’ or ‘default’) to redistribute*
+| switch | `list` | Yes (in here or process) | *What switches to redistribute on, takes precedence over process switch setting*
+
+### Static routes
+Routes are added per-tenant with the tenant being the top-level dictionary that routes are created under. *tenant*, *switch* and *prefix* are lists to make it easy to apply the same routes accross multiple devices and tenants.
+
+***static_route:*** List of tenants the routes will be created under
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| tenant | `list` | Yes | *List of tenants to create all the routes within*
+| switch | `list` | Yes (in here or route) | *List of switches to create all routes on (alternatively can be set per-route)*
+
+***static_route.route:*** List of routes to be created. For routes with the same attributes (for example same next-hop gateway) only need the one list with all the routes in that list of the prefix dictionary.
+| Key      | Value | Mandatory | Information |
+|----------|-------|-----------|-------------|
+| prefix | `list` | Yes | *List of routes that all have same settings (gateway, interface, switch, etc)*
+| gateway | x.x.x.x | Yes | *Next hop gateway address*
+| interface | `string` | No | *Next hop interface*
+| ad | `integrar` | No | *Set the Administraive Distance for this group of routes*
+| next_hop_vrf  | `string` | No | *Set the VRF for next-hop if it is in a different VRF (for route leaking)*
+| switch | `list` | Yes (in here or static_route) | *List of switches that this group of routes are to be created on*
+
+Under the advanced section (*adv*) of the variable file the naming policy of the route-maps and prefix-lists used by OSPF and BGP can be changed.  
+From the values in the *services_routing.yml* file a new per-device data model is created by *svc_rtr_dm* method in the *format_dm.py* custom filter plugin. 
 
 ## Input validation
 Rather than validating configuration on devices it runs before any device configuration and validate the details entered in the variable files are correct. The idea of this pre-validation is to ensure the values in the variable files are in the correct format, have no typos and conform to the rules of the playbook. Catching these errors early allows the playbook to failfast before device connection and configuration.\
@@ -448,6 +669,7 @@ As the playbook has got bigger I found it confusing when run in one go so maybe 
 | fbc             | Generates the fabric configuration snippet                                                          |
 | tnt             | Generates the fabric configuration snippet                                                          |
 | intf            | Generates the interface config snippet                                                              |
+| rtr             | Generates the routing config snippet                                                              |
 | cln             | Generates the configuration snippet to reset all the none used interfaces to the defaults           |
 | bse_fbc         | Generates and joins the base, fabric and inft cleanup configuration snippet                         |
 | bse_fbc_svc     | Generates and joins the base, fabric, all services and inft cleanup configuration snippet           |
