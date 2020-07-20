@@ -355,7 +355,7 @@ At a bare minimun only the mandatory settings are required to form BGP peerings,
 ***bgp.group:*** List of groups that hold global settings for all peers within that group. This table shows settings that can ONLY be configured under the group. A group does not need to have a switch defined, it will be automatically created on any switches that peers within it are created on.
 | Key      | Value | Mandatory | Information |
 |----------|-------|-----------|-------------|
-| name | `string` | Yes | *Name of the group, no duplicate group or peer names are allowed. It is used in group, route-map and prefix-list names
+| name | `string` | Yes | *Name of the group, no duplicate group or peer names are allowed. It is used in group, route-map and prefix-list names*
 
 ***grp.group.peer:*** List of peers within the group that will inherit non-configured settings from that group. This table shows settings that can ONLY be configured under the peer.
 | Key      | Value | Mandatory | Information |
