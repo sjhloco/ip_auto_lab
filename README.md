@@ -1,3 +1,5 @@
+Requires Ansible pre-2.8, see ansible_playbooks or build_fabric for more upto date versions of these playbooks 
+
 # stesworld.com - Making dreams for the dreamers
 
 Initial lab from the ipspace automation course. 
